@@ -91,7 +91,7 @@ A Dockerfile is proved to create a Dockerized server.
 
 ## Development Mode
 
-== Setting Up
+## Setting Up
 
 The shadow-cljs compiler uses all cljsjs and NPM js dependencies through
 NPM. If you use a library that is in cljsjs you will also have to add
@@ -115,7 +115,7 @@ Adding NPM Javascript libraries is as simple as adding them to your
 [the Shadow-cljs User's Guide](https://shadow-cljs.github.io/docs/UsersGuide.html#_javascript)
 for more information.
 
-== Development Mode
+## Development Mode
 
 Shadow-cljs handles the client-side development build. The file
 `src/main/org/edgexfoundry/ui/manager/client.cljs` contains the code to start and refresh
@@ -142,7 +142,7 @@ use the *Builds* menu to enable/disable whichever builds you want watched/runnin
 
 Shadow-cljs will also start a web server for any builds that configure one.
 
-=== Client REPL
+### Client REPL
 
 The shadow-cljs compiler starts an nREPL. It is configured to start on
 port 9000 (in `shadow-cljs.edn`).
@@ -163,7 +163,7 @@ If you're using CIDER
 see [the Shadow-cljs User's Guide](https://shadow-cljs.github.io/docs/UsersGuide.html#_cider)
 for more information.
 
-=== The API Server
+### The API Server
 
 In order to work with your main application you'll want to
 start your own server that can also serve your application's API.
@@ -184,14 +184,14 @@ The URL to work on your application is then
 
 Hot code reload, preloads, and such are all coded into the javascript.
 
-=== Preloads
+### Preloads
 
 There is a preload file that is used on the development build of the
 application `org.edgexfoundry.ui.manager.development-preload`. You can add code here that
 you want to execute before the application initializes in development
 mode.
 
-=== Fulcro Inspect
+### Fulcro Inspect
 
 Fulcro inspect will preload on the development build of the main
 application and workspaces.  You must install the plugin in Chrome from the
