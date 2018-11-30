@@ -1,0 +1,7 @@
+{:port 3000
+ :endpoints {:metadata "localhost:48081"
+             :export "localhost:48071"
+             :data "localhost:48080"
+             :command "localhost:48082"
+             :logging "localhost:48061"
+             :notifications "localhost:48060"}}

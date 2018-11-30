@@ -1,0 +1,7 @@
+{:port 8080
+ :endpoints {:metadata "edgex-core-metadata:48081"
+             :export "edgex-export-client:48071"
+             :data "edgex-core-data:48080"
+             :command "edgex-core-command:48082"
+             :logging "edgex-support-logging:48061"
+             :notifications "edgex-support-notifications:48060"}}
