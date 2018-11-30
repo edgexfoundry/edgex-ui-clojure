@@ -1,0 +1,33 @@
+[Server]
+  Port = 3001
+
+[Clients]
+  [Clients.Data]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48080
+
+  [Clients.Metadata]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48081
+
+  [Clients.Logging]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48061
+
+  [Clients.Export]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48071
+
+  [Clients.Command]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48082
+
+  [Clients.Notifications]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48060
