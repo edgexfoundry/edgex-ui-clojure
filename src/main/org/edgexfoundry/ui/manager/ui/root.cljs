@@ -296,8 +296,7 @@
   :admin-status-modal dv/AdminStatusModal
   :new-device dv/AddDeviceModal
   :set-command-modal cmd/SetCommandModal
-  :new-export ex/AddExportModal
-  :edit-export ex/EditExportModal
+  :new-export ex/ExportModal
   :add-profile-modal p/AddProfileModal
   :new-schedule sc/AddScheduleModal
   :new-schedule-event sc/AddScheduleEventModal
