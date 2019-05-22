@@ -4,12 +4,8 @@
 
 (ns org.edgexfoundry.ui.manager.ui.common
   (:require [fulcro.i18n :refer [tr]]
-            [fulcro.client.primitives :as prim :refer [defui defsc]]
             [fulcro.client.dom :as dom]
-            [fulcro.client.mutations :as m]
             [fulcro.ui.forms :as f]
-            [fulcro.ui.form-state :as fs]
-            [fulcro.ui.bootstrap3 :as b]
             [cljs-time.core :as tc]
             [cljs-time.coerce :as co]
             [cljs-time.format :as ft]
