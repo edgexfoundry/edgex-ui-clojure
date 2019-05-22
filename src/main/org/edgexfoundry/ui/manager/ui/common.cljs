@@ -53,6 +53,14 @@
 
 (defonce notifications-list-ident [:show-notifications :singleton])
 
+(defonce new-notification-ident [:new-notification :singleton])
+
+(defonce subscriptions-list-ident [:show-subscriptions :singleton])
+
+(defonce transmissions-list-ident [:show-transmissions :singleton])
+
+(defonce new-subscription-ident [:new-subscription :singleton])
+
 (defonce exports-list-ident [:show-exports :singleton])
 
 (defonce add-export-ident [:add-export :singleton])
@@ -67,6 +75,36 @@
   (if (= 0 timestamp 0)
     (tr "Never")
     (->> timestamp co/from-long tc/to-default-time-zone (ft/unparse {:format-str "MMMM d, y H:mm:ss"}))))
+
+(defn conv-sub-ctg [category]
+  (case category
+    "SECURITY" "Security"
+    "HW_HEALTH" "Hardware Health"
+    "SW_HEALTH" "Software Health"
+    "Unknown"))
+
+(defn conv-ctg-seq [convec]
+  (->> (mapv conv-sub-ctg convec)
+       (str/join ", ")))
+
+(defn conv-seq [convec]
+  (str/join ", " convec))
+
+(defn conv-channels [convec]
+  (let [newVec (reduce (fn [new_vec value] (if-not (nil? (:url value)) (conj new_vec (:url value)) (conj new_vec (str/join ", " (:mailAddresses value))))) [] convec)]
+    (str/join ", " newVec)))
+
+(defn conv-notify-slug [_ notify]
+  (js/console.log notify)
+  (:slug notify))
+
+(defn conv-tran-status [_ status]
+  (case status
+    :FAILED "Failed"
+    :SENT "Sent"
+    :ACKNOWLEDGED "Acknowledged"
+    :TRXESCALATED "Trxescalated"
+    "Unknown"))
 
 (defn time-now []
   (co/to-long (tc/now)))

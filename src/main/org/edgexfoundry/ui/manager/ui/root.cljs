@@ -24,6 +24,8 @@
             [org.edgexfoundry.ui.manager.ui.profiles :as p]
             [org.edgexfoundry.ui.manager.ui.logging :as logging]
             [org.edgexfoundry.ui.manager.ui.notifications :as nt]
+            [org.edgexfoundry.ui.manager.ui.subscriptions :as sb]
+            [org.edgexfoundry.ui.manager.ui.transmissions :as trn]
             [org.edgexfoundry.ui.manager.ui.addressables :as a]
             [org.edgexfoundry.ui.manager.ui.exports :as ex]
             [org.edgexfoundry.ui.manager.ui.readings :as rd]
@@ -54,6 +56,14 @@
 (defn show-notifications [this]
   (prim/transact! this `[(nt/load-notifications {})])
   (r/nav-to! this :notification))
+
+(defn show-subscriptions [this]
+  (ld/load this co/subscriptions-list-ident sb/SubscriptionList)
+  (r/nav-to! this :subscription))
+
+(defn show-transmissions [this]
+  (prim/transact! this `[(trn/load-transmissions {})])
+  (r/nav-to! this :transmission))
 
 (defn show-exports [this]
   (df/load this co/exports-list-ident ex/ExportList {:fallback `d/show-error})
@@ -131,6 +141,22 @@
                (menu-entry "Devices" "pe-7s-wallet" (or (= route-handler :main) (= route-handler :info)) #(show-devices this))
                (menu-entry "Readings" "pe-7s-graph1" (= route-handler :reading) #(show-readings this))
                ;(menu-entry "Notifications" "pe-7s-bell" (= route-handler :notification) #(show-notifications this))
+               (dom/li
+                 #js {}
+                 (dom/a #js {:onClick (fn [] (prim/transact! this `[(b/toggle-collapse {:id 1})
+                                                                    (m/toggle {:field :ui/collapse-1-toggle})]))
+                             :data-toggle "collapse"
+                             :aria-expanded toggle}
+                        (dom/i #js {:className "pe-7s-bell"})
+                        (dom/p #js {}
+                               "Notifications"
+                               (dom/b #js {:className "caret"})))
+                 (b/ui-collapse collapse
+                                (dom/ul
+                                  #js {:className "nav"}
+                                  (sub-menu-entry "Nt" "Notifications" sidebar? (= route-handler :notification) #(show-notifications this))
+                                  (sub-menu-entry "Sb" "Subscriptions" sidebar? (= route-handler :subscription) #(show-subscriptions this))
+                                  (sub-menu-entry "Tr" "Transmissions" sidebar? (= route-handler :transmission) #(show-transmissions this)))))
                (menu-entry "Schedules" "pe-7s-clock" (or (= route-handler :schedule) (= route-handler :schedule-event)) #(show-schedules this))
                (menu-entry "Export" "pe-7s-next-2" (= route-handler :export) #(show-exports this))
                (menu-entry "Logs" "pe-7s-note2" (= route-handler :logs) #(show-logs this))
@@ -296,6 +322,8 @@
   :admin-status-modal dv/AdminStatusModal
   :new-device dv/AddDeviceModal
   :set-command-modal cmd/SetCommandModal
+  :new-notification nt/NotificationModal
+  :new-subscription sb/SubscriptionModal
   :new-export ex/ExportModal
   :add-profile-modal p/AddProfileModal
   :new-schedule sc/AddScheduleModal
@@ -325,6 +353,7 @@
   (let [delete-cbs {:da-modal a/do-delete-addressable
                     :dd-modal dv/do-delete-device
                     :de-modal ex/do-delete-export
+                    :dsb-modal sb/do-delete-subscription
                     :dp-modal p/do-delete-profile
                     :ds-modal sc/do-delete-schedule
                     :dse-modal sc/do-delete-schedule-event}]

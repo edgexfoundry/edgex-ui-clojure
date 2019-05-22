@@ -28,11 +28,11 @@
     t
     "N/A"))
 
-(defn do-delete-schedule [this id]
+(defn do-delete-schedule [this id props]
   (prim/transact! this `[(mu/delete-schedule {:id ~id})
                          (t/reset-table-page {:id :show-schedules})]))
 
-(defn do-delete-schedule-event [this id]
+(defn do-delete-schedule-event [this id props]
   (prim/transact! this `[(mu/delete-schedule-event {:id ~id})
                          (t/reset-table-page {:id :show-schedule-events})]))
 

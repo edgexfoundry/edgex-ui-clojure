@@ -16,6 +16,8 @@
             [org.edgexfoundry.ui.manager.ui.schedules :as sc]
             [org.edgexfoundry.ui.manager.ui.logging :as log]
             [org.edgexfoundry.ui.manager.ui.notifications :as nt]
+            [org.edgexfoundry.ui.manager.ui.subscriptions :as sb]
+            [org.edgexfoundry.ui.manager.ui.transmissions :as tr]
             [org.edgexfoundry.ui.manager.ui.exports :as ex]))
 
 (defn select-router [props]
@@ -31,6 +33,8 @@
     :ui/show-schedule-events co/schedule-events-list-ident
     :ui/show-logs co/log-entry-list-ident
     :ui/show-notifications co/notifications-list-ident
+    :ui/show-subscriptions co/subscriptions-list-ident
+    :ui/show-transmissions co/transmissions-list-ident
     :ui/show-exports co/exports-list-ident
     (id/edgex-ident props)))
 
@@ -45,6 +49,8 @@
   :show-schedule-events sc/ScheduleEventList
   :show-logs log/LogEntryList
   :show-notifications nt/NotificationList
+  :show-subscriptions sb/SubscriptionList
+  :show-transmissions tr/TransmissionList
   :show-exports ex/ExportList
   :reading-page rd/ReadingsPage
   :device d/DeviceInfo
