@@ -1,11 +1,15 @@
-;;; Copyright (c) 2018
+;;; Copyright (c) 2019
 ;;; IoTech Ltd
 ;;; SPDX-License-Identifier: Apache-2.0
 
 (ns org.edgexfoundry.ui.manager.ui.common
   (:require [fulcro.i18n :refer [tr]]
+            [fulcro.client.primitives :as prim :refer [defui defsc]]
             [fulcro.client.dom :as dom]
+            [fulcro.client.mutations :as m]
             [fulcro.ui.forms :as f]
+            [fulcro.ui.form-state :as fs]
+            [fulcro.ui.bootstrap3 :as b]
             [cljs-time.core :as tc]
             [cljs-time.coerce :as co]
             [cljs-time.format :as ft]
@@ -74,3 +78,58 @@
            (apply f/form-field comp form name params)
            (when (f/invalid? form name)
              (dom/label #js {:className "error"} "Required field"))))
+
+(defn render-field
+  "A helper function for rendering just the fields."
+  [component field checkValid? renderer]
+  (let [form         (prim/props component)
+        entity-ident (prim/get-ident component form)
+        id           (str (first entity-ident) "-" (second entity-ident) "-" field)
+        is-dirty?    (fs/dirty? form field)
+        clean?       (not is-dirty?)
+        validity     (if checkValid? (fs/get-spec-validity form field) :valid) ;
+        is-invalid?  (= :invalid validity)
+        value        (get form field "")]
+    (renderer {:dirty?   is-dirty?
+               :ident    entity-ident
+               :id       id
+               :clean?   clean?
+               :validity validity
+               :invalid? is-invalid?
+               :value    value})))
+
+(def integer-fields #{:exp/port})
+
+(defn input-with-label
+  "A non-library helper function, written by you to help lay out your form."
+  ([component field field-label validation-string placeholder error-fn props input-element]
+   (let [checkValid? (not (str/blank? validation-string))]
+     (render-field component field checkValid?
+                   (fn [{:keys [invalid? id dirty?]}]
+                     (let [attr {:error           (or (when invalid? validation-string) (when error-fn (error-fn)))
+                                 :id              id
+                                 :placeholder     placeholder
+                                 :input-generator input-element}]
+                       (b/labeled-input (if (nil? props) attr (conj attr props)) field-label))))))
+  ([component field field-label validation-string placeholder error-fn props]
+   (let [checkValid? (not (str/blank? validation-string))
+         ensure-integer #(if (js/isNaN %) "" %)]
+     (render-field component field checkValid?
+                   (fn [{:keys [invalid? id dirty? value invalid ident]}]
+                     (let [attr {:value       value
+                                 :id          id
+                                 :error       (or (when invalid? validation-string) (when error-fn (error-fn)))
+                                 :placeholder placeholder
+                                 :onBlur      #(prim/transact! component `[(fs/mark-complete! {:entity-ident ~ident
+                                                                                               :field        ~field})])
+                                 :onChange    (if (integer-fields field)
+                                                #(m/set-value! component field (ensure-integer (js/parseInt (.. % -target -value))))
+                                                #(m/set-string! component field :event %))}]
+                       (b/labeled-input (if (nil? props) attr (conj attr props)) field-label)))))))
+
+(defn factory-apply [js-component-class]
+  (fn [props & children]
+    (apply js/React.createElement
+           js-component-class
+           (dom/convert-props props) ;; convert-props makes sure that props passed to React.createElement are plain JS object
+           children)))
