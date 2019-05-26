@@ -250,8 +250,11 @@
                            ~@search-var ~'content]
                     :as ~'props}
                    (fulcro.client.primitives/props ~'this)
-                   ~'search-filter (fn [~'d] (str/includes? (str/lower-case (~search-keyword ~'d))
-                                                            (str/lower-case ~'search-str)))
+                   ~'search-filter (fn [~'d] (str/includes?
+                                               (str/lower-case (if (vector? ~search-keyword)
+                                                                 (get-in ~'d ~search-keyword)
+                                                                 (~search-keyword ~'d)))
+                                               (str/lower-case ~'search-str)))
                    ~'filtered-content (if (str/blank? ~'search-str)
                                         ~'content
                                         (filter ~'search-filter ~'content))

@@ -144,7 +144,7 @@ func MkTempIdResult(tempid transit.TaggedValue, resp *resty.Response) interface{
 	return result
 }
 
-func MkTempResult(tempid transit.TaggedValue, val int64) interface{} {
+func MkTempResult(tempid transit.TaggedValue, val interface{}) interface{} {
 	result := make(map[interface{}]interface{})
 	tempMap := transit.NewCMap()
 	tempMap = tempMap.Put(tempid, val, transit.Equals)

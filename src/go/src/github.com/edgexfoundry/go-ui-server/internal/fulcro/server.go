@@ -208,6 +208,8 @@ func (s Server) SetupRouter() *gin.Engine {
 		"/profile-yaml",
 		"/addressable",
 		"/notification",
+		"/subscription",
+		"/transmission",
 		"/export",
 		"/log",
 	}

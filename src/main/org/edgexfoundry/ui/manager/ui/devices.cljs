@@ -176,7 +176,7 @@
                                    (add-value-descriptor* id)))))
   (remote [env] (df/remote-load env)))
 
-(defn do-delete-device [this id]
+(defn do-delete-device [this id props]
   (prim/transact! this `[(mu/delete-device {:id ~id})
                          (t/reset-table-page {:id :show-devices})]))
 

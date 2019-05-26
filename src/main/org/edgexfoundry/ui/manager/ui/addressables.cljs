@@ -99,7 +99,7 @@
                          (r/set-route {:router :root/modal-router :target ~co/edit-addressable-ident})
                          (b/show-modal {:id :edit-addressable-modal})]))
 
-(defn do-delete-addressable [this id]
+(defn do-delete-addressable [this id props]
   (prim/transact! this `[(mu/delete-addressable {:id ~id}) :show-addressables]))
 
 (defsc AddAddressableModal [this {:keys [modal modal/page] :as props}]

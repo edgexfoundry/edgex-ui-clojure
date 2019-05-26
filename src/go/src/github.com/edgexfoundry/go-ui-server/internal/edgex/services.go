@@ -261,6 +261,107 @@ func ShowSchedules(params []interface{}, args map[interface{}]interface{}) inter
 	result["events"] = getScheduleEvents()
 	return fulcro.Keywordize(result)
 }
+func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string) (interface{}, error) {
+	const batchSize = 100
+	const maxRequests = 100
+	result := make([]interface{}, batchSize * maxRequests)
+	ids := make(map[transit.Keyword]bool)
+	pos := 0
+	limit := maxRequests
+	toStr := strconv.FormatInt(to, 10)
+	batchStr := strconv.FormatInt(batchSize, 10)
+	var count int
+	for ok := true; ok; ok = (count == batchSize) && (limit > 0) {
+		fromStr := strconv.FormatInt(from, 10)
+		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + notifyType + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr)
+
+		if err != nil {
+			return nil, err
+		}
+
+		var data []map[string]interface{}
+		json.Unmarshal(resp.Body(), &data)
+		logs := fulcro.AddType(data, notifyType).([]map[string]interface{})
+		inc := 0
+		var last float64 = 0
+		for i, log := range logs {
+			ts := log["created"].(float64)
+			if ts != last {
+				inc = 0
+			}
+			for _, key := range keys {
+				if value, ok := log[key]; ok {
+					logs[i][key] = transit.Keyword(value.(string))
+				}
+			}
+			inc++
+			last = ts
+		}
+		count = len(logs)
+		if count > 0 {
+			from = int64(logs[count-1]["created"].(float64))
+			for _, entry := range logs {
+				id := entry["id"].(transit.Keyword)
+				if !ids[id] {
+					ids[id] = true
+					result[pos] = entry
+					pos++
+				}
+			}
+		}
+		limit--
+	}
+	return result[:pos], nil
+}
+
+func ShowNotifications(params []interface{}, args map[interface{}]interface{}) interface{} {
+	result := make(map[string]interface{})
+	start := fulcro.GetInt(args, "start")
+	end := fulcro.GetInt(args, "end")
+	keys := []string{"id", "category", "severity", "status"}
+	result["content"], _ = getNotifyInTimeRange(start, end, "notification", keys)
+	return fulcro.Keywordize(result)
+}
+
+func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) interface{} {
+	var data []map[string]interface{}
+	result := make(map[string]interface{})
+	resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "subscription")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		subscriptions := fulcro.AddType(data, "subscription")
+		subscriptions = fulcro.MakeKeyword(subscriptions, "id")
+		result["content"] = subscriptions
+	}
+	return fulcro.Keywordize(result)
+}
+
+func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) interface{} {
+	var data []map[string]interface{}
+	result := make(map[string]interface{})
+	slug := fulcro.GetString(args, "slug")
+
+	if slug != "" {
+		const maxRequests = 100
+		batchStr := strconv.FormatInt(maxRequests, 10)
+		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "transmission/slug/" + slug + "/" + batchStr)
+
+		if err == nil {
+			json.Unmarshal(resp.Body(), &data)
+			transmissions := fulcro.AddType(data, "transmission")
+			transmissions = fulcro.MakeKeyword(transmissions, "id")
+			transmissions = fulcro.MakeKeyword(transmissions, "status")
+			result["content"] = transmissions
+		}
+	} else {
+		start := fulcro.GetInt(args, "start")
+		end := fulcro.GetInt(args, "end")
+		keys := []string{"id", "status"}
+		result["content"], _ = getNotifyInTimeRange(start, end, "transmission", keys)
+	}
+	return fulcro.Keywordize(result)
+}
 
 func ShowExports(params []interface{}, args map[interface{}]interface{}) interface{} {
 	resp, _ := resty.R().Get(getEndpoint(ClientExport) + "registration")
@@ -275,6 +376,128 @@ func ShowExports(params []interface{}, args map[interface{}]interface{}) interfa
 	result := make(map[string]interface{})
 	result["content"] = exports
 	return fulcro.Keywordize(result)
+}
+
+type Notification struct {
+	Id          string `json:"id,omitempty"`
+	Slug        string `json:"slug"`
+	Sender      string `json:"sender"`
+	Category    string `json:"category"`
+	Severity    string `json:"severity"`
+	Content     string `json:"content"`
+	Description string `json:"description,omitempty"`
+	Labels    []string `json:"labels"`
+}
+
+func AddNotification(args map[interface{}]interface{}) interface{} {
+	var result interface{}
+	tempid := fulcro.GetTempId(args, "tempid")
+	notify := Notification{
+		Id: "",
+		Slug: fulcro.GetString(args, "slug"),
+		Description: fulcro.GetString(args, "description"),
+		Sender: fulcro.GetString(args, "sender"),
+		Category: fulcro.GetString(args, "category"),
+		Severity: fulcro.GetString(args, "severity"),
+		Content: fulcro.GetString(args,"content"),
+		Labels: fulcro.GetStringSeq(args, "labels"),
+	}
+	resp, err := resty.R().SetBody(notify).Post(getEndpoint(ClientNotifications) + "notification")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result
+}
+
+type Channel struct {
+	Type            string `json:"type,omitempty"`  // REST or EMAIL
+	MailAddresses []string    `json:"mailAddresses,omitempty"`
+	Url             string `json:"url,omitempty"`
+}
+
+type Subscription struct {
+	Id                     string `json:"id,omitempty"`
+	Slug                   string `json:"slug"`
+	Receiver               string `json:"receiver"`
+	Description            string `json:"description,omitempty"`
+	SubscribedCategories []string `json:"subscribedCategories,omitempty"`
+	SubscribedLabels     []string `json:"subscribedLabels,omitempty"`
+	Channels             []interface{} `json:"channels"`
+}
+
+func AddSubscription(args map[interface{}]interface{}) interface{} {
+	var result interface{}
+	tempid := fulcro.GetTempId(args, "tempid")
+	slug := fulcro.GetString(args, "slug")
+
+	subscription := Subscription{
+		Id: "",
+		Slug: slug,
+		Description: fulcro.GetString(args, "description"),
+		Receiver: fulcro.GetString(args, "receiver"),
+		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
+		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
+		Channels: getChannelSeq(args, "channels"),
+	}
+	_, err := resty.R().SetBody(subscription).Post(getEndpoint(ClientNotifications) + "subscription")
+	if err == nil {
+		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
+		if err == nil {
+			var data map[string]interface{}
+			json.Unmarshal(resp.Body(), &data)
+			id := data["id"].(string)
+			result = fulcro.MkTempResult(tempid, transit.Keyword(id))
+		}
+	}
+	return result
+}
+
+func EditSubscription(args map[interface{}]interface{}) interface{} {
+	id := fulcro.GetKeyword(args, "id")
+	subscription := Subscription{
+		Id: string(id),
+		Slug: fulcro.GetString(args, "slug"),
+		Description: fulcro.GetString(args, "description"),
+		Receiver: fulcro.GetString(args, "receiver"),
+		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
+		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
+		Channels: getChannelSeq(args, "channels"),
+	}
+	resty.R().SetBody(subscription).Put(getEndpoint(ClientNotifications) + "subscription")
+	return id
+}
+
+func DeleteSubscription(args map[interface{}]interface{}) interface{} {
+	slug := fulcro.GetString(args, "slug")
+	resty.R().Delete(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
+	return slug
+}
+
+func getChannelSeq(args map[interface{}]interface{}, id string) []interface{} {
+	outer := args[transit.Keyword(id)].([]interface{})
+	result := make([]interface{}, len(outer))
+	for i, s := range outer {
+		seq := s.(map[interface{}]interface{})
+		var channel Channel
+		for key, v := range seq {
+			switch key {
+			case transit.Keyword("type"):
+				channel.Type = v.(string)
+			case transit.Keyword("url"):
+				channel.Url = v.(string)
+			case transit.Keyword("mailAddresses"):
+				arr := v.([]interface{})
+				emails := make([]string, len(arr))
+				for j, email := range arr {
+					emails[j] = email.(string)
+				}
+				//channel.MailAddresses = v.([]string)
+				channel.MailAddresses = emails
+			}
+		}
+		result[i] = channel
+	}
+	return result
 }
 
 func ShowProfiles(params []interface{}, args map[interface{}]interface{}) interface{} {
