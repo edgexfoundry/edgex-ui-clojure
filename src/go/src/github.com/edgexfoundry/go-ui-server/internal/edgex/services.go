@@ -6,12 +6,12 @@ package edgex
 
 import (
 	"encoding/json"
+	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
+	"github.com/russolsen/transit"
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
-	"github.com/russolsen/transit"
+	"time"
 
 	"gopkg.in/resty.v1"
 )
@@ -261,7 +261,7 @@ func ShowSchedules(params []interface{}, args map[interface{}]interface{}) inter
 	result["events"] = getScheduleEvents()
 	return fulcro.Keywordize(result)
 }
-func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string) (interface{}, error) {
+func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string, slug string) (interface{}, error) {
 	const batchSize = 100
 	const maxRequests = 100
 	result := make([]interface{}, batchSize * maxRequests)
@@ -273,7 +273,13 @@ func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string
 	var count int
 	for ok := true; ok; ok = (count == batchSize) && (limit > 0) {
 		fromStr := strconv.FormatInt(from, 10)
-		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + notifyType + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr)
+		var url string
+		if slug == "" {
+			url = getEndpoint(ClientNotifications) + notifyType + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr
+		} else {
+			url = getEndpoint(ClientNotifications) + notifyType + "/slug/" + slug + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr
+		}
+		resp, err := resty.R().Get(url)
 
 		if err != nil {
 			return nil, err
@@ -319,7 +325,7 @@ func ShowNotifications(params []interface{}, args map[interface{}]interface{}) i
 	start := fulcro.GetInt(args, "start")
 	end := fulcro.GetInt(args, "end")
 	keys := []string{"id", "category", "severity", "status"}
-	result["content"], _ = getNotifyInTimeRange(start, end, "notification", keys)
+	result["content"], _ = getNotifyInTimeRange(start, end, "notification", keys, "")
 	return fulcro.Keywordize(result)
 }
 
@@ -338,28 +344,21 @@ func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) i
 }
 
 func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) interface{} {
-	var data []map[string]interface{}
 	result := make(map[string]interface{})
 	slug := fulcro.GetString(args, "slug")
+	var start int64
+	var end int64
 
 	if slug != "" {
-		const maxRequests = 100
-		batchStr := strconv.FormatInt(maxRequests, 10)
-		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "transmission/slug/" + slug + "/" + batchStr)
-
-		if err == nil {
-			json.Unmarshal(resp.Body(), &data)
-			transmissions := fulcro.AddType(data, "transmission")
-			transmissions = fulcro.MakeKeyword(transmissions, "id")
-			transmissions = fulcro.MakeKeyword(transmissions, "status")
-			result["content"] = transmissions
-		}
+		// show the transmissions from a week ago till now if get by slug
+		end = int64(time.Now().UnixNano())/int64(time.Millisecond)
+		start = int64(time.Now().AddDate(0, 0, -7).UnixNano())/int64(time.Millisecond)
 	} else {
-		start := fulcro.GetInt(args, "start")
-		end := fulcro.GetInt(args, "end")
-		keys := []string{"id", "status"}
-		result["content"], _ = getNotifyInTimeRange(start, end, "transmission", keys)
+		start = fulcro.GetInt(args, "start")
+		end = fulcro.GetInt(args, "end")
 	}
+	keys := []string{"id", "status"}
+	result["content"], _ = getNotifyInTimeRange(start, end, "transmission", keys, slug)
 	return fulcro.Keywordize(result)
 }
 
@@ -397,8 +396,8 @@ func AddNotification(args map[interface{}]interface{}) interface{} {
 		Slug: fulcro.GetString(args, "slug"),
 		Description: fulcro.GetString(args, "description"),
 		Sender: fulcro.GetString(args, "sender"),
-		Category: fulcro.GetString(args, "category"),
-		Severity: fulcro.GetString(args, "severity"),
+		Category: fulcro.GetKeywordAsString(args, "category"),
+		Severity: fulcro.GetKeywordAsString(args, "severity"),
 		Content: fulcro.GetString(args,"content"),
 		Labels: fulcro.GetStringSeq(args, "labels"),
 	}

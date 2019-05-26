@@ -22,6 +22,7 @@
             [org.edgexfoundry.ui.manager.ui.commands :as cmd]
             [org.edgexfoundry.ui.manager.ui.schedules :as sc]
             [org.edgexfoundry.ui.manager.ui.profiles :as p]
+            [org.edgexfoundry.ui.manager.ui.load :as ld]
             [org.edgexfoundry.ui.manager.ui.logging :as logging]
             [org.edgexfoundry.ui.manager.ui.notifications :as nt]
             [org.edgexfoundry.ui.manager.ui.subscriptions :as sb]
