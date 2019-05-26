@@ -1,0 +1,93 @@
+@import url("index.css");
+
+.exportModal.modal-body {
+  max-height: calc(100vh - 250px)
+}
+
+.card .form-group > label {
+  text-transform: none;
+  font-size: 14px;
+}
+
+.form-group .btn-group, .form-group .dropdown-menu {
+  width: 100%;
+}
+
+.btn.dropdown-toggle {
+  text-align: left;
+  width: 100%;
+}
+
+.form-group .btn .caret {
+  float: right;
+  margin-top: 10px;
+}
+
+.rw-multiselect [role="listbox"] {
+  min-height: 0;
+  border: none;
+}
+
+.progressLine {
+  margin-top: 15px;
+}
+
+.progressLine li {
+  list-style-type: none;
+  width: 33%;
+  float: left;
+  font-size: 14px;
+  font-weight: 500;
+  position: relative;
+  text-align: center;
+  color: #73D0FE;
+  z-index: 1;
+}
+
+.progressLine li:before {
+  width: 15px;
+  height: 15px;
+  content: "";
+  line-height: 20px;
+  display: block;
+  text-align: center;
+  margin: 0 auto 10px auto;
+  border-radius: 50%;
+  background-color: #73D0FE;
+}
+
+.progressLine li:after {
+  width: 100%;
+  height: 2px;
+  content: '';
+  position: absolute;
+  background-color: #73D0FE;
+  top: 8px;
+  left: -46%;
+  z-index: -1;
+}
+
+.progressLine li:first-child:after {
+  content: none;
+}
+
+.progressLine li.active {
+  color: #5DBCD2;
+  font-weight: 800;
+}
+
+.progressLine li.active:before {
+  background-color: #73D0FE;
+}
+
+.progressLine li.active:after {
+  background-color: #73D0FE;
+}
+
+.progressLine li.active ~ li:after, .progressLine .active ~ li::before {
+  background-color: #C9CACA;
+}
+
+.progressLine li.active ~ li {
+  color: #C9CACA;
+}

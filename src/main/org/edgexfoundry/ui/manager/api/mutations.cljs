@@ -151,13 +151,13 @@
   (remote [env] true))
 
 (defmutation add-export
-  [{:keys [tempid name addressable format destination compression encryptionAlgorithm encryptionKey initializingVector
-           enable]}]
+  [{:keys [tempid name format destination compression encryptionAlgorithm encryptionKey initializingVector
+           device-filter reading-filter enable] :as exp}]
   (action [{:keys [state]}]
-          (let [addr (select-keys addressable [:address :method :name :origin :password :path :port :protocol
-                                               :publisher :topic :user])
+          (let [addr (select-keys exp [:address :method :origin :password :path :port :protocol :publisher :topic :user :cert
+                                       :key])
                 ex (-> (u/mk-export addr format destination compression encryptionAlgorithm encryptionKey
-                                    initializingVector enable)
+                                    initializingVector device-filter reading-filter enable)
                        (merge {:id tempid
                                :type :export
                                :name name}))
@@ -168,15 +168,22 @@
   (remote [env] true))
 
 (defmutation edit-export
-  [{:keys [id addressable format destination compression encryptionAlgorithm encryptionKey initializingVector
-           enable]}]
+  [{:keys [id name format destination compression encryptionAlgorithm encryptionKey initializingVector enable
+           device-filter reading-filter] :as exp}]
   (action [{:keys [state]}]
-          (let [addr (select-keys addressable [:address :method :name :origin :password :path :port :protocol
-                                               :publisher :topic :user])
-                ex (-> (u/mk-export addr format destination compression encryptionAlgorithm encryptionKey
-                                    initializingVector enable)
+          (let [addr (select-keys exp [:address :method :origin :password :path :port :protocol :publisher :topic :user :cert
+                                       :key])
+                map-method #(case %
+                              :post "POST"
+                              :put "PUT"
+                              :delete "DELETE"
+                              "GET")
+                ex (-> (u/mk-export (update addr :method map-method) format destination compression encryptionAlgorithm encryptionKey
+                                    initializingVector device-filter reading-filter enable)
                        (merge {:id id
-                               :type :export}))]
+                               :name name
+                               :type :export
+                               :method (map-method (:method addr))}))]
             (swap! state (fn [s] (-> s
                                      (update-in [:export id] merge ex))))))
   (remote [env] true))
