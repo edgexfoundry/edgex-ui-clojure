@@ -806,7 +806,6 @@ type Filter struct {
 	ValueDescriptorIdentifiers []string `json:"valueDescriptorIdentifiers"`
 }
 
-
 type Export struct {
 	Id          string `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
