@@ -625,6 +625,7 @@ type Device struct {
 	Addressable    Named    `json:"addressable"`
 	AdminState     string   `json:"adminState"`
 	OperatingState string   `json:"operatingState"`
+	Protocols      map[string]interface{} `json:"protocols"`
 }
 
 func AddDevice(args map[interface{}]interface{}) interface{} {
@@ -633,7 +634,8 @@ func AddDevice(args map[interface{}]interface{}) interface{} {
 	labels := fulcro.GetStringSeq(args, "labels")
 	profileName := fulcro.GetString(args, "profile-name")
 	serviceName := fulcro.GetString(args, "service-name")
-	addressableName := fulcro.GetString(args, "addressable-name")
+	protocols := fulcro.GetPrtsMap(args, "protocols")
+	addressableName := name + "-addr"
 	device := Device{Name: name,
 		Description:    description,
 		Labels:         labels,
@@ -642,8 +644,36 @@ func AddDevice(args map[interface{}]interface{}) interface{} {
 		Addressable:    Named{Name: addressableName},
 		AdminState:     "UNLOCKED",
 		OperatingState: "ENABLED",
+		Protocols:       protocols,
 	}
-	resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
+	address := fulcro.GetString(args, "address")
+	protocol := fulcro.GetString(args, "protocol")
+	port := fulcro.GetInt(args, "port")
+	path := fulcro.GetString(args, "path")
+	method := strings.ToUpper(string(fulcro.GetKeyword(args, "method")))
+	publisher := fulcro.GetString(args, "publisher")
+	topic := fulcro.GetString(args, "topic")
+	user := fulcro.GetString(args, "user")
+	password := fulcro.GetString(args, "password")
+	addressable := Addressable{
+		Id:        "",
+		Name:      addressableName,
+		Address:   address,
+		Protocol:  protocol,
+		Port:      port,
+		Path:      path,
+		Method:    method,
+		Publisher: publisher,
+		Topic:     topic,
+		User:      user,
+		Password:  password,
+		Cert:      "",
+		Key:       "",
+	}
+	_, err := resty.R().SetBody(addressable).Post(getEndpoint(ClientMetadata) + "addressable")
+	if err == nil {
+		resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
+	}
 	return nil
 }
 

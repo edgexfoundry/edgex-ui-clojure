@@ -25,6 +25,8 @@
 
 (defonce new-device-ident [:new-device :singleton])
 
+(defonce new-device-entry [:device-entry-subform :singleton])
+
 (defonce add-profile-ident [:add-profile :singleton])
 
 (defonce reading-list-ident [:show-readings :singleton])

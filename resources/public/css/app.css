@@ -91,3 +91,30 @@
 .progressLine li.active ~ li {
   color: #C9CACA;
 }
+
+/* for Protocol Table */
+.prt .h5 {
+  margin-bottom: 0;
+}
+
+.prts .form-group {
+  padding-bottom: 15px;
+}
+
+.prts .col-sm-9 {
+  width: 100%;
+}
+
+.prt-table td {
+  padding: 10px!important;
+}
+
+.prt-table .form-group {
+  width: 80%;
+  margin-left: 2px;
+}
+
+.prt-table .col-sm-9 {
+  padding-left: 0;
+  width: 100%;
+}
