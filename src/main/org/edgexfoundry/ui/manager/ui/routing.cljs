@@ -12,7 +12,7 @@
     [fulcro.client.logging :as log]
     [org.edgexfoundry.ui.manager.ui.common :as co]))
 
-(def app-routing-tree
+#_(def app-routing-tree
   (r/routing-tree
     (r/make-route :main [(r/router-instruction :device-router co/device-list-ident)])
     (r/make-route :info [(r/router-instruction :device-router [:device :param/id])])
@@ -30,6 +30,40 @@
     (r/make-route :transmission [(r/router-instruction :device-router co/transmissions-list-ident)])
     (r/make-route :export [(r/router-instruction :device-router co/exports-list-ident)])))
 
+(def app-routing-tree
+  (r/routing-tree
+    (r/make-route :login [(r/router-instruction :top-router [:login :top])])
+    (r/make-route :main [(r/router-instruction :top-router [:device :top])
+                         (r/router-instruction :device-router co/device-list-ident)])
+    (r/make-route :info [(r/router-instruction :top-router [:device :top])
+                         (r/router-instruction :device-router [:device :param/id])])
+    (r/make-route :control [(r/router-instruction :top-router [:device :top])
+                            (r/router-instruction :device-router co/command-list-ident)])
+    (r/make-route :reading [(r/router-instruction :top-router [:device :top])
+                            (r/router-instruction :device-router co/reading-page-ident)])
+    (r/make-route :profile [(r/router-instruction :top-router [:device :top])
+                            (r/router-instruction :device-router co/profile-list-ident)])
+    (r/make-route :schedule [(r/router-instruction :top-router [:device :top])
+                             (r/router-instruction :device-router co/schedules-list-ident)])
+    (r/make-route :schedule-event [(r/router-instruction :top-router [:device :top])
+                                   (r/router-instruction :device-router co/schedule-events-list-ident)])
+    (r/make-route :schedule-event-info [(r/router-instruction :top-router [:device :top])
+                                        (r/router-instruction :device-router [:schedule-event :param/id])])
+    (r/make-route :profile-yaml [(r/router-instruction :top-router [:device :top])
+                                 (r/router-instruction :device-router co/profile-yaml-ident)])
+    (r/make-route :addressable [(r/router-instruction :top-router [:device :top])
+                                (r/router-instruction :device-router co/addressable-list-ident)])
+    (r/make-route :logs [(r/router-instruction :top-router [:device :top])
+                         (r/router-instruction :device-router co/log-entry-list-ident)])
+    (r/make-route :notification [(r/router-instruction :top-router [:device :top])
+                                 (r/router-instruction :device-router co/notifications-list-ident)])
+    (r/make-route :subscription [(r/router-instruction :top-router [:device :top])
+                                 (r/router-instruction :device-router co/subscriptions-list-ident)])
+    (r/make-route :transmission [(r/router-instruction :top-router [:device :top])
+                                 (r/router-instruction :device-router co/transmissions-list-ident)])
+    (r/make-route :export [(r/router-instruction :top-router [:device :top])
+                           (r/router-instruction :device-router co/exports-list-ident)])))
+
 (def valid-handlers (-> (get app-routing-tree r/routing-tree-key) keys set))
 
 ;; To keep track of the global HTML5 pushy routing object
@@ -39,7 +73,8 @@
 (defonce use-html5-routing (atom true))
 
 (def app-routes
-  [[:get "/" :main]
+  [[:get "/login" :login]
+   [:get "/" :main]
    [:get "/info/:id{[0-9a-f]+}" :info]
    [:get "/command" :control]
    [:get "/reading" :reading]
@@ -67,7 +102,7 @@
   Use the plain function `nav-to!` for UI-level navigation."
   [state-map {:keys [handler route-params] :as sibiro-match}]
   (if @use-html5-routing
-    (let [path (sibiro/uri-for compiled-routes handler route-params)]
+    (let [path (:uri (sibiro/uri-for compiled-routes handler route-params))]
       (pushy/set-token! @history path)
       state-map)
     (r/update-routing-links state-map sibiro-match)))
@@ -80,10 +115,10 @@
   (let [rp (into {} (for [[k v] route-params] [k (keyword v)]))
         sm {:handler handler :route-params rp}]
     (cond
-      ;(or (= :new-user handler) (= :login handler)) (r/update-routing-links state-map sibiro-match)
-      ;(not (:logged-in? state-map)) (-> state-map
-      ;                                  (assoc :loaded-uri (when @history #?(:clj "/" (pushy/get-token @history)))
-      ;                                  (redirect* {:handler :login}))
+      (or (= :login handler)) (r/update-routing-links state-map sibiro-match)
+      (not (:logged-in? state-map)) (-> state-map
+                                        (assoc :loaded-uri (when @history (pushy/get-token @history)))
+                                        (redirect* {:handler :login}))
       (invalid-route? handler) (redirect* state-map {:handler :main})
       :else (-> state-map
                 (r/update-routing-links sm)
@@ -109,7 +144,7 @@
      (if (and @history @use-html5-routing)
        (let [path (:uri (sibiro/uri-for compiled-routes page rp))]
          (pushy/set-token! @history path))
-       (prim/transact! component `[(set-route! ~{:handler page :route-params route-params}) :device-page])))))
+       (prim/transact! component `[(set-route! ~{:handler page :route-params route-params})])))))
 
 (defn match-uri [uri]
   (let [match (sibiro/match-uri compiled-routes uri :get)]
@@ -121,6 +156,6 @@
           set-route! (fn [match]
                        ; Delay. history events should happen after a tx is processed, but a set token could happen during.
                        ; Time doesn't matter. This thread has to let go of the CPU before timeouts can process.
-                       (js/setTimeout #(prim/transact! app-root `[(set-route! ~match) :device-page]) 10))]
+                       (js/setTimeout #(prim/transact! app-root `[(set-route! ~match) :top-router]) 10))]
       (reset! history (pushy/pushy set-route! match-uri))
          (pushy/start! @history))))

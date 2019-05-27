@@ -15,6 +15,8 @@
             [cljs-time.format :as ft]
             [clojure.string :as str]))
 
+(defonce login-page-ident [:login-page :singleton])
+
 (defonce main-page-ident [:main-page :singleton])
 
 (defonce device-list-ident [:show-devices :singleton])
@@ -70,6 +72,10 @@
 (defonce new-export-ident [:new-export :singleton])
 
 (defonce endpoint-ident [:endpoint :singleton])
+
+(defonce logout-ident [:logout :singleton])
+
+(defonce change-pw-ident [:change-pw :singleton])
 
 (defn conv-time [timestamp]
   (if (= 0 timestamp 0)

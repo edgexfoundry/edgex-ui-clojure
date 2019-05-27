@@ -7,9 +7,33 @@
     [fulcro.client.mutations :as m :refer [defmutation]]
     [fulcro.ui.bootstrap3 :as b]
     [org.edgexfoundry.ui.manager.ui.common :as co]
+    [org.edgexfoundry.ui.manager.ui.load :as ld]
+    [org.edgexfoundry.ui.manager.ui.routing :as r]
     [org.edgexfoundry.ui.manager.api.util :as u]
     [cljs-time.coerce :as ct]
-    [cljs-time.format :as ft]))
+    [cljs-time.format :as ft]
+    [pushy.core :as pushy]))
+
+(defmutation login-complete
+  "Fulcro mutation: Attempted login post-mutation the update the UI with the result. Requires the app-root of the mounted application
+  so routing can be started."
+  [{:keys [app-root]}]
+  (action [{:keys [component state]}]
+          ; idempotent (start routing)
+          (when app-root
+            (r/start-routing app-root))
+          (swap! state (fn [s] (-> s
+                                   (assoc-in (conj co/login-page-ident :ui/password) "")
+                                   (assoc :logged-in? true :pw-updated? false :fulcro/server-error nil))))
+          (r/nav-to! component :main)))
+
+(defmutation logout
+  "Fulcro mutation: Removes user identity from the local app and asks the server to forget the user as well."
+  [p]
+  (action [{:keys [component state]}]
+          (swap! state assoc :logged-in? false)
+          (when (and @r/use-html5-routing @r/history)
+            (pushy/set-token! @r/history "/login"))))
 
 (defmutation upload-profile
   "Upload profile"

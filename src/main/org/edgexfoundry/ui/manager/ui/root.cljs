@@ -5,7 +5,7 @@
 (ns org.edgexfoundry.ui.manager.ui.root
   (:require [fulcro.client.mutations :as m :refer [defmutation]]
             [fulcro.client.data-fetch :as df]
-            [fulcro.client.dom :as dom]
+            [fulcro.client.localized-dom :as dom]
             [fulcro.ui.forms :as f :refer [form-field* defvalidator]]
             [fulcro.client.primitives :as prim :refer [defsc]]
             [fulcro.client.routing :refer [defrouter]]
@@ -30,12 +30,18 @@
             [org.edgexfoundry.ui.manager.ui.exports :as ex]
             [org.edgexfoundry.ui.manager.ui.readings :as rd]
             [org.edgexfoundry.ui.manager.ui.endpoints :as ep]
-            [org.edgexfoundry.ui.manager.ui.dialogs :as d]))
+            [org.edgexfoundry.ui.manager.ui.dialogs :as d]
+            [org.edgexfoundry.ui.manager.ui.login :as lg]
+            [org.edgexfoundry.ui.manager.ui.load :as ld]))
 
 (defn show-devices [this]
   (df/load this co/device-list-ident dv/DeviceList {:fallback `d/show-error})
   (df/load this co/profile-list-ident p/ProfileList {:fallback `d/show-error})
   (r/nav-to! this :main))
+
+(defn show-logout-modal [comp]
+  (prim/transact! comp `[(b/show-modal {:id :logout-modal})
+                         (m/toggle {:field :ui/menu-open?})]))
 
 (defn show-readings [this]
   (df/load this co/reading-page-ident rd/ReadingsPage {:fallback `d/show-error})
@@ -124,7 +130,12 @@
             :key :support-history}
            (dom/a nil
                   (dom/i #js {:className "pe-7s-ticket"})
-                  " Support Data "))])
+                  " Support Data "))
+   (dom/li {:onClick #(show-logout-modal this)
+            :key :logout}
+           (dom/a nil
+                  (dom/i :$pe-7s-next-2)
+                  " Log out "))])
 
 (defn sidebar [this route-handler sidebar? nav-open? collapse toggle]
   (dom/div {:className "sidebar"}
@@ -243,22 +254,24 @@
                                (dom/a {:href "http://www.edgexfoundry.org"} " EdgeX Foundry Website "))))
        "")))
 
-(defsc Main [this {:keys [device-page ui/collapse-1 ui/collapse-1-toggle ui/sidebar-open? ui/menu-open? ui/nav-open?
-                          ui/loading-data ui/route-handler]}]
-  {:initial-state (fn [p] {:device-page (prim/get-initial-state main/MainPage nil)
-                           :ui/collapse-1 (prim/get-initial-state b/Collapse {:id 1 :start-open false})
+(defsc Main [this {:keys [device-data ui/collapse-1 ui/collapse-1-toggle ui/sidebar-open? ui/menu-open? ui/nav-open?
+                          ui/loading-data ui/route-handler page]:as props}]
+  {:initial-state (fn [p] {:ui/collapse-1 (prim/get-initial-state b/Collapse {:id 1 :start-open false})
                            :ui/collapse-1-toggle false
                            :ui/sidebar-open? true
                            :ui/menu-open? false
                            :ui/nav-open? false
-                           :ui/route-handler :main})
+                           :ui/route-handler :main
+                           :page :device :device-data (prim/get-initial-state main/DeviceListOrInfoRouter {})})
    :ident         (fn [] co/main-page-ident)
-   :query         [{:device-page (prim/get-query main/MainPage)}
+   :query         [:page {:device-data (prim/get-query main/DeviceListOrInfoRouter)}
                    {:ui/collapse-1 (prim/get-query b/Collapse)}
-                   :ui/collapse-1-toggle :ui/sidebar-open? :ui/menu-open? :ui/nav-open? :ui/route-handler [:ui/loading-data '_]]}
+                   :ui/collapse-1-toggle :ui/sidebar-open? :ui/menu-open? :ui/nav-open? :ui/route-handler [:ui/loading-data '_]
+                   [df/marker-table :readings-marker]]}
   (let [attr (if sidebar-open?
                nil
                #js {:className "sidebar-mini"})
+        no-graph-load (-> props (get [df/marker-table :readings-marker]) not)
         sidebar? false]
     (dom/div attr
              (dom/div #js {:className (cond-> "wrapper"
@@ -268,12 +281,13 @@
                         #js {:className "main-panel"}
                         (navbar this sidebar? nav-open? menu-open?)
                         (dom/div #js {:className "main-content"}
-                                 (dom/div
-                                   #js {:className "container-fluid"}
-                                   (if loading-data
-                                     (dom/div #js {:style #js {:padding "50%" :margin "-8px" :width "16px" :height "16px"}}
-                                              (dom/i #js {:className "fa fa-cog fa-spin fa-3x fa-fw"}))
-                                     (main/ui-main-page device-page))))
+                                 (dom/div :$container-fluid
+                                          (if (and loading-data no-graph-load)
+                                            (dom/div {:style {:padding "50%" :margin "-8px" :width "16px" :height "16px"}}
+                                                     (dom/i {:className "fa fa-cog fa-spin fa-3x fa-fw"}))
+                                            (if-not (nil? page)
+                                              (dom/div nil
+                                                       (main/ui-device-list-or-info device-data))))))
                         (footer))))))
 
 (def ui-main (prim/factory Main))
@@ -328,20 +342,41 @@
   :add-profile-modal p/AddProfileModal
   :new-schedule sc/AddScheduleModal
   :new-schedule-event sc/AddScheduleEventModal
+  :change-pw lg/ChangePWModal
   :delete-modal d/DeleteModal)
 
 (def ui-modal-router (prim/factory ModalRouter))
 
-(defsc Root [this {:keys [ui/react-key root/main ui/locale-selector ui/error-modal ui/modals ui/endpoint-modal]
+(defn select-router [props]
+  (condp #(contains? %2 %1) props
+    :ui/password [:login :top]
+    :pw-updated? [:login :top]
+    :device-data [:device :top]
+    [:device :top]))
+
+(defrouter TopRouter :top-router
+           (fn [this props]
+             (if (contains? props :page)
+               [(:page props) :top]
+               (select-router props)))
+           :login lg/LoginPage
+           :device Main)
+
+(def ui-top (prim/factory TopRouter))
+
+(defsc Root [this {:keys [ui/react-key ui/locale-selector ui/error-modal ui/modals ui/endpoint-modal ui/logout-modal top-router]
                    :or {react-key "ROOT"}}]
   {:css [[:$modal-body {:max-height "calc(100vh - 210px)"
                         :overflow-y "auto"}]]
    :initial-state (fn [p] (merge
-                           {:root/main       (prim/get-initial-state Main nil)
-                            :ui/locale-selector (prim/get-initial-state LocaleSelector {})
+                           {:ui/locale-selector (prim/get-initial-state LocaleSelector {})
                             :ui/error-modal (prim/get-initial-state ErrorModal {})
                             :ui/modals (prim/get-initial-state ModalRouter {})
-                            :ui/endpoint-modal (prim/get-initial-state ep/EndpointModal {})}
+                            :ui/endpoint-modal (prim/get-initial-state ep/EndpointModal {})
+                            :ui/logout-modal    (prim/get-initial-state lg/LogoutModal {})
+                            :top-router         (prim/get-initial-state TopRouter {})
+                            :logged-in?          false
+                            :pw-updated?         false}
                            r/app-routing-tree))
    :query         [:ui/locale :ui/react-key
                    {:root/main (prim/get-query Main)}
@@ -349,7 +384,12 @@
                    {:ui/error-modal (prim/get-query ErrorModal)}
                    {:ui/modals (prim/get-query ModalRouter)}
                    {:ui/endpoint-modal (prim/get-query ep/EndpointModal)}
-                   fulcro.client.routing/routing-tree-key]}
+                   {:ui/logout-modal    (prim/get-query lg/LogoutModal)}
+                   {:top-router         (prim/get-query TopRouter)}
+                   :ui/loading-data
+                   fulcro.client.routing/routing-tree-key
+                   :logged-in?
+                   :pw-updated?]}
   (let [delete-cbs {:da-modal a/do-delete-addressable
                     :dd-modal dv/do-delete-device
                     :de-modal ex/do-delete-export
@@ -358,9 +398,10 @@
                     :ds-modal sc/do-delete-schedule
                     :dse-modal sc/do-delete-schedule-event}]
     (dom/div #js {:key react-key}
-             (ui-main main)
+             (ui-top top-router)
              (ui-error-modal error-modal)
              (ui-modal-router (prim/computed modals delete-cbs))
-             (ep/ui-endpoint-modal endpoint-modal))))
+             (ep/ui-endpoint-modal endpoint-modal)
+             (lg/ui-logout-modal logout-modal))))
 
 (css/upsert-css "console-css" Root)

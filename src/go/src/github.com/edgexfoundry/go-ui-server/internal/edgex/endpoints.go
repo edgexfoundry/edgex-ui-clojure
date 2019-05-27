@@ -24,16 +24,16 @@ func InitEndpoints(config *Config) {
 	endpoints[ClientNotifications] = config.Clients["Notifications"].Endpoint()
 }
 
-func SaveEndpoints(args map[interface{}]interface{}) interface{} {
+func SaveEndpoints(args map[interface{}]interface{}) (interface{}, error) {
 	endpoints[ClientData] = args[transit.Keyword(ClientData)]
 	endpoints[ClientMetadata] = args[transit.Keyword(ClientMetadata)]
 	endpoints[ClientCommand] = args[transit.Keyword(ClientCommand)]
 	endpoints[ClientLogging] = args[transit.Keyword(ClientLogging)]
 	endpoints[ClientExport] = args[transit.Keyword(ClientExport)]
 	endpoints[ClientNotifications] = args[transit.Keyword(ClientNotifications)]
-	return ""
+	return nil, nil
 }
 
-func Endpoints(params []interface{}, args map[interface{}]interface{}) interface{} {
-	return fulcro.Keywordize(endpoints)
+func Endpoints(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	return fulcro.Keywordize(endpoints, nil)
 }

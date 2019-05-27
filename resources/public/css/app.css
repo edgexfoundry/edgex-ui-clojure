@@ -91,3 +91,89 @@
 .progressLine li.active ~ li {
   color: #C9CACA;
 }
+
+/*login form*/
+.login-wrap {
+  width: 100%;
+  margin: auto;
+  max-width: 525px;
+  min-height: 470px;
+  position: relative;
+  padding-top: 100px;
+}
+
+.login-html {
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  padding: 90px 70px 50px 70px;
+  background: #f4f4f4;
+}
+
+.login-form {
+  min-height: 345px;
+  position: relative;
+  -webkit-perspective: 1000px;
+}
+
+.login-pw .form-group {
+    width: 108%;
+}
+
+.login-pw .form-group .col-sm-9 {
+    width: 100%;
+    margin-left: -15px;
+}
+
+.login-form button {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.welcome {
+  font-weight: 200;
+  font-size: 40px;
+  font-size: 2.5rem;
+  letter-spacing: 0px;
+  letter-spacing: 0.05rem;
+  padding-bottom: 10px;
+}
+
+.subtitle {
+  line-height: 1em;
+  font-weight: 100;
+  letter-spacing: 0px;
+  letter-spacing: 0.02rem;
+}
+
+.foot-link {
+  text-align: center;
+  padding-top: 20px;
+  text-decoration: underline;
+}
+
+.foot-link a {
+  color: #7D7978;
+}
+
+.foot-link a:hover {
+  color: #595958;
+  font-weight: 800;
+}
+
+.err-msg {
+  padding: 10px;
+  background: linear-gradient(#ffafbd,#ffc3a0);
+  opacity: 0.85;
+  margin-top: 20px;
+  color: #EC2F05;
+  font-weight: 600;
+}
+
+.success-msg {
+  padding: 10px;
+  background: linear-gradient(#AEDAFB,#f2fcfe);
+  opacity: 0.85;
+  margin-top: 20px;
+  color: #333;
+}
