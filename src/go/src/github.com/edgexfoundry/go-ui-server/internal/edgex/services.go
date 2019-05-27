@@ -21,12 +21,11 @@ import (
 )
 
 func Login(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
-	var result interface{}
 	password := fulcro.GetString(args, "password")
 
 	saved, err := ioutil.ReadFile("./data/password")
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	expectedPassword := string(saved)
 	// remove last '\n' character of expectedPassword
@@ -36,19 +35,18 @@ func Login(params []interface{}, args map[interface{}]interface{}) (interface{},
 	existing := []byte(expectedPassword)
 
 	if (bcrypt.CompareHashAndPassword(existing, incoming) != nil) {
-		return  result, errors.New("Invalid Password")
+		return  nil, errors.New("Invalid Password")
 	}
-	return result, nil
+	return nil, nil
 }
 
 func ChangePassword(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
-	var result interface{}
 	oldpw := fulcro.GetString(args, "oldpw")
 	newpw := fulcro.GetString(args, "newpw")
 
 	saved, err := ioutil.ReadFile("./data/password")
 	if err != nil {
-		return result, err
+		return nil, err
 	}
 	expectedPassword := string(saved)
 	// remove last '\n' character of expectedPassword
@@ -59,19 +57,19 @@ func ChangePassword(params []interface{}, args map[interface{}]interface{}) (int
 
 	err = bcrypt.CompareHashAndPassword(existing, incoming)
 	if err != nil {
-		return  result, errors.New("Invalid Current Password")
+		return  nil, errors.New("Invalid Current Password")
 	}
 
 	modifying := []byte(newpw)
 	hashedBytes, err := bcrypt.GenerateFromPassword(modifying, bcrypt.DefaultCost)
 	if err != nil {
-		return  result, err
+		return  nil, err
 	}
 	err = ioutil.WriteFile("./data/password", hashedBytes, 0644)
 	if err != nil {
-		return  result, err
+		return  nil, err
 	}
-	return true, nil
+	return nil, nil
 }
 
 func getDevices() (interface{}, error) {
