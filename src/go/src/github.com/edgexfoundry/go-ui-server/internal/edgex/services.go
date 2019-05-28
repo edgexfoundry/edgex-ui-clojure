@@ -5,7 +5,10 @@
 package edgex
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -188,6 +191,17 @@ func getReadingsInTimeRange(name string, from int64, to int64) interface{} {
 		for _, reading := range readings {
 			if reading["device"].(string) != name {
 				continue
+			}
+			//check floatEncoding
+			valueDesName := reading["name"].(string)
+			resp, err := resty.R().Get(getEndpoint(ClientData) + "valuedescriptor/name/" + valueDesName)
+			var valueDesData map[string]interface{}
+			json.Unmarshal(resp.Body(), &valueDesData)
+			if err == nil && valueDesData["floatEncoding"] != nil && valueDesData["floatEncoding"].(string) == "Base64"{
+				float32_value := reading["value"].(string)
+				decodeValue, _ := base64.StdEncoding.DecodeString(float32_value)
+				bits := binary.LittleEndian.Uint32(decodeValue)
+				reading["value"] = math.Float32frombits(bits)
 			}
 			id := reading["id"].(string)
 			if !ids[id] {
@@ -679,7 +693,18 @@ func AddDevice(args map[interface{}]interface{}) interface{} {
 
 func DeleteDevice(args map[interface{}]interface{}) interface{} {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientMetadata) + "device/id/" + string(id))
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "device/" + string(id))
+	if err == nil {
+		var data map[string]interface{}
+		json.Unmarshal(resp.Body(), &data)
+		service := data["service"].(map[string]interface{})
+		addressable := service["addressable"].(map[string]interface{})
+		addressableId := addressable["id"].(string)
+		_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "device/id/" + string(id))
+		if err == nil {
+			_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "addressable/id/" + addressableId)
+		}
+	}
 	return id
 }
 
