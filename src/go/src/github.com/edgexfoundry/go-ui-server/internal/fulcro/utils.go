@@ -135,6 +135,22 @@ func GetMap(args map[interface{}]interface{}, id string) map[interface{}]interfa
 	return args[transit.Keyword(id)].(map[interface{}]interface{})
 }
 
+func GetPrtsMap(args map[interface{}]interface{}, id string) map[string]interface{} {
+	prts := args[transit.Keyword(id)].(map[interface{}]interface{})
+	result := make(map[string]interface{})
+	for i, v := range prts {
+		inner_result := v.(map[interface{}]interface{})
+		child_node := make(map[string]string)
+		for j, w := range inner_result {
+			key := string(j.(transit.Keyword))
+			child_node[key] = w.(string)
+		}
+		pr_key := string(i.(transit.Keyword))
+		result[pr_key] = child_node
+	}
+	return result;
+}
+
 func GetStringSeq(args map[interface{}]interface{}, id string) []string {
 	seq := args[transit.Keyword(id)].([]interface{})
 	result := make([]string, len(seq))

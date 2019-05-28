@@ -44,14 +44,18 @@
                      :started-callback (fn [{:keys [reconciler] :as app}]
                                          (upload/install-reconciler! upload-networking reconciler)
                                          (df/load app :q/edgex-devices devices/DeviceListEntry
-                                                 {:target (df/multiple-targets
-                                                            (conj co/device-list-ident :content)
-                                                            (conj co/reading-page-ident :devices))
-                                                  :marker false
-                                                  :fallback `d/show-error})
+                                                  {:target (df/multiple-targets
+                                                             (conj co/device-list-ident :content)
+                                                             (conj co/reading-page-ident :devices)
+                                                             (conj co/new-device-entry :devices))
+                                                   :marker false
+                                                   :fallback `d/show-error})
                                          (df/load app :q/edgex-device-services devices/ServiceListEntry
-                                                 {:target (conj co/device-list-ident :services)
-                                                  :fallback `d/show-error})
+                                                  {:target (df/multiple-targets
+                                                             (conj co/device-list-ident :services)
+                                                             (conj co/new-device-entry :services))
+                                                   :marker false
+                                                   :fallback `d/show-error})
                                          (df/load app :q/edgex-schedule-events devices/ScheduleEventListEntry
                                                  {:target (conj co/device-list-ident :schedule-events)
                                                   :fallback `d/show-error})
@@ -63,11 +67,12 @@
                                                   :marker false
                                                   :fallback `d/show-error})
                                          (df/load app :q/edgex-profiles devices/ProfileListEntry
-                                                 {:target (df/multiple-targets
-                                                            (conj co/profile-list-ident :content)
-                                                            (conj co/new-device-ident :profiles))
-                                                  :marker false
-                                                  :fallback `d/show-error})
+                                                  {:target (df/multiple-targets
+                                                             (conj co/profile-list-ident :content)
+                                                             (conj co/new-device-ident :profiles)
+                                                             (conj co/new-device-entry :profiles))
+                                                   :marker false
+                                                   :fallback `d/show-error})
                                          (df/load app co/schedules-list-ident sc/ScheduleList {:fallback `d/show-error})
                                          (df/load app co/exports-list-ident ex/ExportList {:fallback `d/show-error})
                                          (df/load app co/subscriptions-list-ident sb/SubscriptionList {:fallback `d/show-error})

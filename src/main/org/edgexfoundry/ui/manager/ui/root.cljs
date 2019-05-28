@@ -22,6 +22,7 @@
             [org.edgexfoundry.ui.manager.ui.commands :as cmd]
             [org.edgexfoundry.ui.manager.ui.schedules :as sc]
             [org.edgexfoundry.ui.manager.ui.profiles :as p]
+            [org.edgexfoundry.ui.manager.ui.load :as ld]
             [org.edgexfoundry.ui.manager.ui.logging :as logging]
             [org.edgexfoundry.ui.manager.ui.notifications :as nt]
             [org.edgexfoundry.ui.manager.ui.subscriptions :as sb]
@@ -345,7 +346,7 @@
   :new-addressable a/AddAddressableModal
   :edit-addressable a/EditAddressableModal
   :admin-status-modal dv/AdminStatusModal
-  :new-device dv/AddDeviceModal
+  :new-device dv/NewDeviceModal
   :set-command-modal cmd/SetCommandModal
   :new-notification nt/NotificationModal
   :new-subscription sb/SubscriptionModal

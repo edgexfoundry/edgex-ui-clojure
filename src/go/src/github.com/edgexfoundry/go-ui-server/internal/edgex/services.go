@@ -5,13 +5,17 @@
 package edgex
 
 import (
+	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
+  "math"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
 	"github.com/russolsen/transit"
@@ -278,6 +282,17 @@ func getReadingsInTimeRange(name string, from int64, to int64) (interface{}, err
 			if reading["device"].(string) != name {
 				continue
 			}
+			//check floatEncoding
+			valueDesName := reading["name"].(string)
+			resp, err := resty.R().Get(getEndpoint(ClientData) + "valuedescriptor/name/" + valueDesName)
+			var valueDesData map[string]interface{}
+			json.Unmarshal(resp.Body(), &valueDesData)
+			if err == nil && valueDesData["floatEncoding"] != nil && valueDesData["floatEncoding"].(string) == "Base64"{
+				float32_value := reading["value"].(string)
+				decodeValue, _ := base64.StdEncoding.DecodeString(float32_value)
+				bits := binary.LittleEndian.Uint32(decodeValue)
+				reading["value"] = math.Float32frombits(bits)
+			}
 			id := reading["id"].(string)
 			if !ids[id] {
 				ids[id] = true
@@ -371,7 +386,7 @@ func ShowSchedules(params []interface{}, args map[interface{}]interface{}) (inte
 	return fulcro.Keywordize(result, err)
 }
 
-func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string) (interface{}, error) {
+func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string, slug string) (interface{}, error) {
 	const batchSize = 100
 	const maxRequests = 100
 	result := make([]interface{}, batchSize * maxRequests)
@@ -383,7 +398,13 @@ func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string
 	var count int
 	for ok := true; ok; ok = (count == batchSize) && (limit > 0) {
 		fromStr := strconv.FormatInt(from, 10)
-		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + notifyType + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr)
+		var url string
+		if slug == "" {
+			url = getEndpoint(ClientNotifications) + notifyType + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr
+		} else {
+			url = getEndpoint(ClientNotifications) + notifyType + "/slug/" + slug + "/start/" + fromStr + "/end/" + toStr + "/" + batchStr
+		}
+		resp, err := resty.R().Get(url)
 
 		if err != nil {
 			return nil, err
@@ -430,7 +451,7 @@ func ShowNotifications(params []interface{}, args map[interface{}]interface{}) (
 	end := fulcro.GetInt(args, "end")
 	var err error
 	keys := []string{"id", "category", "severity", "status"}
-	result["content"], err = getNotifyInTimeRange(start, end, "notification", keys)
+	result["content"], err = getNotifyInTimeRange(start, end, "notification", keys, "")
 	return fulcro.Keywordize(result, err)
 }
 
@@ -449,28 +470,22 @@ func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) (
 }
 
 func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
-	var data []map[string]interface{}
 	result := make(map[string]interface{})
 	slug := fulcro.GetString(args, "slug")
-	var err error
-	if slug != "" {
-		const maxRequests = 100
-		batchStr := strconv.FormatInt(maxRequests, 10)
-		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "transmission/slug/" + slug + "/" + batchStr)
+	var start int64
+	var end int64
+  var err error
 
-		if err == nil {
-			json.Unmarshal(resp.Body(), &data)
-			transmissions := fulcro.AddType(data, "transmission")
-			transmissions = fulcro.MakeKeyword(transmissions, "id")
-			transmissions = fulcro.MakeKeyword(transmissions, "status")
-			result["content"] = transmissions
-		}
+	if slug != "" {
+		// show the transmissions from a week ago till now if get by slug
+		end = int64(time.Now().UnixNano())/int64(time.Millisecond)
+		start = int64(time.Now().AddDate(0, 0, -7).UnixNano())/int64(time.Millisecond)
 	} else {
-		start := fulcro.GetInt(args, "start")
-		end := fulcro.GetInt(args, "end")
-		keys := []string{"id", "status"}
-		result["content"], err = getNotifyInTimeRange(start, end, "transmission", keys)
+		start = fulcro.GetInt(args, "start")
+		end = fulcro.GetInt(args, "end")
 	}
+	keys := []string{"id", "status"}
+	result["content"], err = getNotifyInTimeRange(start, end, "transmission", keys, slug)
 	return fulcro.Keywordize(result, err)
 }
 
@@ -479,7 +494,6 @@ func ShowExports(params []interface{}, args map[interface{}]interface{}) (interf
 	result := make(map[string]interface{})
 
 	resp, err := resty.R().Get(getEndpoint(ClientExport) + "registration")
-
 	if err == nil {
 		json.Unmarshal(resp.Body(), &data)
 		exports := fulcro.AddType(data, "export")
@@ -653,6 +667,7 @@ type Device struct {
 	Addressable    Named    `json:"addressable"`
 	AdminState     string   `json:"adminState"`
 	OperatingState string   `json:"operatingState"`
+	Protocols      map[string]interface{} `json:"protocols"`
 }
 
 func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
@@ -661,6 +676,7 @@ func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 	labels := fulcro.GetStringSeq(args, "labels")
 	profileName := fulcro.GetString(args, "profile-name")
 	serviceName := fulcro.GetString(args, "service-name")
+	protocols := fulcro.GetPrtsMap(args, "protocols")
 	addressableName := name + "-addr"
 	device := Device{Name: name,
 		Description:    description,
@@ -670,6 +686,7 @@ func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 		Addressable:    Named{Name: addressableName},
 		AdminState:     "UNLOCKED",
 		OperatingState: "ENABLED",
+		Protocols:       protocols,
 	}
 	address := fulcro.GetString(args, "address")
 	protocol := fulcro.GetString(args, "protocol")
@@ -708,7 +725,8 @@ func DeleteDevice(args map[interface{}]interface{}) (interface{}, error) {
 	if err == nil {
 		var data map[string]interface{}
 		json.Unmarshal(resp.Body(), &data)
-		addressable := data["addressable"].(map[string]interface{})
+		service := data["service"].(map[string]interface{})
+		addressable := service["addressable"].(map[string]interface{})
 		addressableId := addressable["id"].(string)
 		_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "device/id/" + string(id))
 		if err == nil {

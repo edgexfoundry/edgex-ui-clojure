@@ -56,14 +56,14 @@
 
 (def app-routes
   [[:get "/login" :login]
-   [:get "/" :main]
-   [:get "/info/:id{[0-9a-f]+}" :info]
+  [[:get "/" :main]
+   [:get "/info/:id{[0-9a-f-]+}" :info]
    [:get "/command" :control]
    [:get "/reading" :reading]
    [:get "/profile" :profile]
    [:get "/schedule" :schedule]
    [:get "/schedule-event" :schedule-event]
-   [:get "/schedule-event-info/:id{[0-9a-f]+}" :schedule-event-info]
+   [:get "/schedule-event-info/:id{[0-9a-f-]+}" :schedule-event-info]
    [:get "/profile-yaml" :profile-yaml]
    [:get "/addressable" :addressable]
    [:get "/log" :logs]

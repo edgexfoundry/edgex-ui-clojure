@@ -39,6 +39,7 @@
                  [kibu/pushy "0.3.8"]
                  [thi.ng/geom "0.0.908"]
                  [sablono "0.8.4"]
+                 [promenade "0.7.0"]
 
                  ; only required if you want to use this for tests
                  [fulcrologic/fulcro-spec "2.1.3" :scope "test"]]
