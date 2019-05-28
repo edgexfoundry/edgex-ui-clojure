@@ -159,6 +159,48 @@
   (action [{:keys [state] :as env}]
           (e/edgex-put-command url values)))
 
+(defmutation add-notification
+  [{:keys [tempid slug description sender category severity content labels]}]
+  (action [{:keys [state]}]
+          (let [notifyObj {:id tempid
+                           :type :notification
+                           :slug slug
+                           :description description
+                           :sender sender
+                           :category category
+                           :severity severity
+                           :content content
+                           :labels labels}]
+            (timbre/info "add notification" slug notifyObj)
+            {::prim/tempids {tempid (->>
+                                      notifyObj
+                                      (e/edgex-post :notification "notification")
+                                      :body
+                                      keyword)}})))
+
+(defmutation add-subscription
+  [{:keys [tempid slug] :as sub}]
+  (action [{:keys [state]}]
+          (timbre/info "add subscription" slug sub)
+          {::prim/tempids {tempid (->>
+                                    sub
+                                    (e/edgex-post :subscription "subscription")
+                                    :body
+                                    keyword)}}))
+
+(defmutation edit-subscription
+  [{:keys [id] :as sub}]
+  (action [{:keys [state]}]
+          (e/edgex-put :subscription "subscription" sub)
+          id))
+
+(defmutation delete-subscription
+  [{:keys [slug]}]
+  (action [{:keys [state]}]
+          (->> slug
+               (str "subscription/slug/")
+               (e/edgex-delete :subscription))))
+
 (defmutation add-export
   [{:keys [tempid name addressable format destination compression encryptionAlgorithm encryptionKey initializingVector
            enable]}]

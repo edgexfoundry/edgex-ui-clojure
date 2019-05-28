@@ -13,6 +13,7 @@
             [org.edgexfoundry.ui.manager.ui.devices :as devices]
             [org.edgexfoundry.ui.manager.ui.schedules :as sc]
             [org.edgexfoundry.ui.manager.ui.exports :as ex]
+            [org.edgexfoundry.ui.manager.ui.subscriptions :as sb]
             [org.edgexfoundry.ui.manager.ui.endpoints :as ep]
             [fulcro.client.mutations :as m :refer [defmutation]]
             [org.edgexfoundry.ui.manager.ui.routing :as r]
@@ -69,6 +70,7 @@
                                                   :fallback `d/show-error})
                                          (df/load app co/schedules-list-ident sc/ScheduleList {:fallback `d/show-error})
                                          (df/load app co/exports-list-ident ex/ExportList {:fallback `d/show-error})
+                                         (df/load app co/subscriptions-list-ident sb/SubscriptionList {:fallback `d/show-error})
                                          (df/load app co/endpoint-ident ep/EndpointForm {:post-mutation `build-form})
                                          (r/start-routing reconciler))
                      :networking {:remote      (net/make-fulcro-network "/api" :global-error-callback identity)

@@ -4,7 +4,7 @@
 
 (ns org.edgexfoundry.ui.manager.api.mutations
   (:require
-    [fulcro.client.mutations :refer [defmutation]]
+    [fulcro.client.mutations :as m :refer [defmutation]]
     [fulcro.ui.bootstrap3 :as b]
     [org.edgexfoundry.ui.manager.ui.common :as co]
     [org.edgexfoundry.ui.manager.api.util :as u]
@@ -148,6 +148,50 @@
             (swap! state (fn [s] (-> s
                                      (assoc-in [:schedule tempid] sc)
                                      (update-in [:show-schedules :singleton :content] add-ref))))))
+  (remote [env] true))
+
+(defmutation add-notification
+  [{:keys [tempid slug description sender category severity content labels]}]
+  (action [{:keys [state]}]
+          (let [notifyObj {:id tempid
+                           :type :notification
+                           :slug slug
+                           :description description
+                           :sender sender
+                           :category category
+                           :severity severity
+                           :content content
+                           :labels labels}
+                add-ref #(conj % [:notification tempid])]
+            (swap! state (fn [s] (-> s
+                                     (assoc-in [:notification tempid] notifyObj)
+                                     (update-in [:show-notifications :singleton :content] add-ref))))))
+  (remote [env] true))
+
+(defmutation add-subscription
+  [{:keys [tempid] :as sub}]
+  (action [{:keys [state]}]
+          (let [add-ref #(conj % [:subscription tempid])
+                subObj (merge sub {:id tempid :type :subscription})]
+            (swap! state (fn [s] (-> s
+                                     (assoc-in [:subscription tempid] subObj)
+                                     (update-in [:show-subscriptions :singleton :content] add-ref))))))
+  (remote [env] true))
+
+(defmutation edit-subscription
+  [{:keys [id] :as sub}]
+  (action [{:keys [state]}]
+          (swap! state (fn [s] (-> s
+                                   (assoc-in [:subscription id] sub)))))
+  (remote [env] true))
+
+(defmutation delete-subscription
+  [{:keys [id slug]}]
+  (action [{:keys [state]}]
+          (letfn [(filter-subscription [list] (filterv #(not= (second %) id) list))]
+            (swap! state (fn [s] (-> s
+                                     (update :subscription dissoc id)
+                                     (update-in (conj co/subscriptions-list-ident :content) filter-subscription))))))
   (remote [env] true))
 
 (defmutation add-export

@@ -26,6 +26,8 @@
     (r/make-route :addressable [(r/router-instruction :device-router co/addressable-list-ident)])
     (r/make-route :logs [(r/router-instruction :device-router co/log-entry-list-ident)])
     (r/make-route :notification [(r/router-instruction :device-router co/notifications-list-ident)])
+    (r/make-route :subscription [(r/router-instruction :device-router co/subscriptions-list-ident)])
+    (r/make-route :transmission [(r/router-instruction :device-router co/transmissions-list-ident)])
     (r/make-route :export [(r/router-instruction :device-router co/exports-list-ident)])))
 
 (def valid-handlers (-> (get app-routing-tree r/routing-tree-key) keys set))
@@ -49,6 +51,8 @@
    [:get "/addressable" :addressable]
    [:get "/log" :logs]
    [:get "/notification" :notification]
+   [:get "/subscription" :subscription]
+   [:get "/transmission" :transmission]
    [:get "/export" :export]])
 
 (def compiled-routes (sibiro/compile-routes app-routes))

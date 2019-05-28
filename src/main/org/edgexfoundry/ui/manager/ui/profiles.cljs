@@ -155,7 +155,7 @@
   (prim/transact! this `[(load-profile-yaml {:id ~id})])
   (routing/nav-to! this :profile-yaml))
 
-(defn do-delete-profile [this id]
+(defn do-delete-profile [this id props]
   (prim/transact! this `[(mu/delete-profile {:id ~id})
                          (t/reset-table-page {:id :show-profiles})]))
 

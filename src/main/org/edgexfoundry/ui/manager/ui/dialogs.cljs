@@ -10,13 +10,13 @@
             [fulcro.client.routing :as r]
             [fulcro.ui.bootstrap3 :as b]))
 
-(defsc DeleteModal [this {:keys [target-id name modal modal-id]} callbacks]
+(defsc DeleteModal [this {:keys [target-id name modal modal-id props]} callbacks]
        {:initial-state (fn [p] {:target-id :none
                                 :name ""
                                 :modal-id (or (:modal-id p) :none)
                                 :modal (prim/get-initial-state b/Modal {:id (:modal-id p) :backdrop true})})
         :ident [:delete-modal :modal-id]
-        :query [:modal-id :target-id :name {:modal (prim/get-query b/Modal)}]}
+        :query [:modal-id :target-id :name :props {:modal (prim/get-query b/Modal)}]}
   (let [hide-modal (fn [modal-id] (prim/transact! this `[(b/hide-modal {:id ~modal-id})]))]
        (b/ui-modal modal
                    (b/ui-modal-title nil
@@ -28,32 +28,35 @@
                    (b/ui-modal-footer nil
                                       (b/button {:key "ok-button" :className "btn-fill" :kind :info
                                                  :onClick #(do
-                                                             ((get callbacks modal-id) this target-id)
+                                                             ((get callbacks modal-id) this target-id props)
                                                              (hide-modal modal-id))}
                                                 "Delete")
                                       (b/button {:key "cancel-button" :className "btn-fill" :kind :danger
                                                  :onClick #(hide-modal modal-id)}
                                                 "Cancel")))))
 (defn set-delete-target*
-  [state modal-id type id]
+  [state modal-id type id props]
   (let [target (get-in state [type id])
         set-modal-state (fn [state attr val] (assoc-in state [:delete-modal modal-id attr] val))]
     (-> state
         (set-modal-state :target-id id)
-        (set-modal-state :name (:name target)))))
+        (set-modal-state :name (or (:name target) (:slug target)))
+        (set-modal-state :props props))))
 
 (defmutation prepare-delete-modal
-             [{:keys [modal-id type id]}]
+             [{:keys [modal-id type id props]}]
              (action [{:keys [state]}]
                      (swap! state (fn [s] (-> s
-                                              (set-delete-target* modal-id type id))))))
+                                              (set-delete-target* modal-id type id props))))))
 
-(defn mk-show-modal [modal-id]
-  (fn [comp type id]
-    (prim/transact! comp `[(prepare-delete-modal {:modal-id ~modal-id :type ~type :id ~id})
-                           (r/set-route {:router :root/modal-router :target [:delete-modal ~modal-id]})
-                           (b/show-modal {:id ~modal-id})])))
-
+(defn mk-show-modal
+  ([modal-id]
+   (mk-show-modal modal-id nil))
+  ([modal-id props]
+   (fn [comp type id]
+     (prim/transact! comp `[(prepare-delete-modal {:modal-id ~modal-id :type ~type :id ~id :props ~props})
+                            (r/set-route {:router :root/modal-router :target [:delete-modal ~modal-id]})
+                            (b/show-modal {:id ~modal-id})]))))
 (defn- show-modal* [modal tf]
   (assoc modal :modal/visible tf))
 
