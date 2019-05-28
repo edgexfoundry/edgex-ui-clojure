@@ -37,7 +37,8 @@
                                                 (let [value      (.. event -target -value)
                                                       field-info {:form-id form-id
                                                                   :field   field-name
-                                                                  :value   (str/split-lines value)}]
+                                                                  :value   (->> value str/split-lines
+                                                                                (filterv #(-> % str/blank? not)))}]
                                                   (prim/transact! component
                                                                   `[(f/set-field ~field-info)
                                                                     ~@(f/get-on-form-change-mutation form field-name :edit)

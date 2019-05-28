@@ -5,33 +5,16 @@
 (ns org.edgexfoundry.ui.manager.api.util)
 
 (defn mk-export [addressable format destination compression encryptionAlgorithm encryptionKey
-                 initializingVector enable]
+                 initializingVector reading-filter device-filter enable]
   (let [addr (select-keys addressable [:address :method :name :origin :password :path :port :protocol
-                                       :publisher :topic :user])
+                                       :publisher :topic :user :cert :key])
                 ex {:addressable addr
-                    :format (case format
-                              :JSON "JSON"
-                              :XML "XML"
-                              :IOTCORE_JSON "IOTCORE_JSON"
-                              :AZURE_JSON "AZURE_JSON"
-                              :THINGSBOARD_JSON "THINGSBOARD_JSON"
-                              :NOOP "NOOP")
-                    :destination (case destination
-                                   :MQTT_TOPIC "MQTT_TOPIC"
-                                   :ZMQ_TOPIC "ZMQ_TOPIC"
-                                   :REST_ENDPOINT "REST_ENDPOINT"
-                                   :IOTCORE_TOPIC "IOTCORE_TOPIC"
-                                   :AZURE_TOPIC "AZURE_TOPIC"
-                                   :XMPP_TOPIC "XMPP_TOPIC"
-                                   :AWS_TOPIC "AWS_TOPIC"
-                                   :INFLUXDB_ENDPOINT "INFLUXDB_ENDPOINT")
-                    :compression (case compression
-                                   :NONE "NONE"
-                                   :GZIP "GZIP"
-                                   :ZIP "ZIP")
-                    :encryption {:encryptionAlgorithm (case encryptionAlgorithm
-                                                        :NONE "NONE"
-                                                        :AES "AES")}
+                    :format format
+                    :destination destination
+                    :compression compression
+                    :encryption {:encryptionAlgorithm encryptionAlgorithm}
+                    :filter {:deviceIdentifiers device-filter
+                             :valueDescriptorIdentifiers reading-filter}
                     :enable enable}
                 assoc-if-encrypt (fn [key val ex]
                                    (if (= encryptionAlgorithm :NONE)

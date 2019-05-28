@@ -170,3 +170,8 @@ button[aria-disabled="true"] {
   white-space: nowrap;
   width: 1px;
 }
+
+/* for Export Modal */
+.form-group.exportModal .control-label{
+  padding-right: 20px;
+}

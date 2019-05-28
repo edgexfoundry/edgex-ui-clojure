@@ -6,8 +6,10 @@
   "dependencies": {
     "highlight-yaml": "0.0.1",
     "highlight.js": "^9.13.1",
+    "rc-switch": "^1.9.0",
     "react-grid-layout": "^0.16.6",
     "react-icons": "^2.2.7",
+    "react-widgets": "^4.4.11",
     "reakit": "^0.11.2"
   },
   "devDependencies": {

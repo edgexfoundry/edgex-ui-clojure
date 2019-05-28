@@ -442,6 +442,8 @@ type Addressable struct {
 	Topic     string `json:"topic"`
 	User      string `json:"user"`
 	Password  string `json:"password"`
+	Cert      string `json:"cert,omitempty"`
+	Key       string `json:"key,omitempty"`
 }
 
 func AddAddressable(args map[interface{}]interface{}) interface{} {
@@ -577,6 +579,11 @@ type Encryption struct {
 	InitializingVector  string `json:"initializingVector,omitempty"`
 }
 
+type Filter struct {
+	DeviceIdentifiers []string `json:"deviceIdentifiers"`
+	ValueDescriptorIdentifiers []string `json:"valueDescriptorIdentifiers"`
+}
+
 type Export struct {
 	Id          string `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
@@ -585,27 +592,31 @@ type Export struct {
 	Destination string `json:"destination"`
 	Compression string `json:"compression"`
 	Encrypt     Encryption `json:"encryption"`
+	Filt        Filter `json:"filter"`
 	Enable      bool `json:"enable"`
 }
 
 func AddExport(args map[interface{}]interface{}) interface{} {
+	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
-	addressable := fulcro.GetMap(args, "addressable")
+	name := fulcro.GetString(args, "name")
 	export := Export{
 		Id: "",
-		Name: fulcro.GetString(args, "name"),
+		Name: name,
 		Addr: Addressable{
 			Id:        "",
-			Name:      fulcro.GetString(addressable, "name"),
-			Address:   fulcro.GetString(addressable, "address"),
-			Protocol:  fulcro.GetString(addressable, "protocol"),
-			Port:      fulcro.GetInt(addressable, "port"),
-			Path:      fulcro.GetString(addressable, "path"),
-			Method:    fulcro.GetString(addressable, "method"),
-			Publisher: fulcro.GetString(addressable, "publisher"),
-			Topic:     fulcro.GetString(addressable, "topic"),
-			User:      fulcro.GetString(addressable, "user"),
-			Password:  fulcro.GetString(addressable, "password"),
+			Name:      name + "-addr",
+			Address:   fulcro.GetString(args, "address"),
+			Protocol:  fulcro.GetString(args, "protocol"),
+			Port:      fulcro.GetInt(args, "port"),
+			Path:      fulcro.GetString(args, "path"),
+			Method:    strings.ToUpper(string(fulcro.GetKeyword(args, "method"))),
+			Publisher: fulcro.GetString(args, "publisher"),
+			Topic:     fulcro.GetString(args, "topic"),
+			User:      fulcro.GetString(args, "user"),
+			Password:  fulcro.GetString(args, "password"),
+			Cert:      fulcro.GetString(args, "cert"),
+			Key:       fulcro.GetString(args, "key"),
 		},
 		Format:      fulcro.GetKeywordAsString(args, "format"),
 		Destination: fulcro.GetKeywordAsString(args, "destination"),
@@ -615,38 +626,51 @@ func AddExport(args map[interface{}]interface{}) interface{} {
 			EncryptionKey:       fulcro.GetString(args, "encryptionKey"),
 			InitializingVector:  fulcro.GetString(args, "initializingVector"),
 		},
+		Filt: Filter{
+			DeviceIdentifiers: fulcro.GetStringSeq(args, "device-filter"),
+			ValueDescriptorIdentifiers: fulcro.GetStringSeq(args, "reading-filter"),
+		},
 		Enable: fulcro.GetBool(args, "enable"),
 	}
-	resp, _ := resty.R().SetBody(export).Post(getEndpoint(ClientExport) + "registration")
-	return fulcro.MkTempIdResult(tempid, resp)
+	resp, err := resty.R().SetBody(export).Post(getEndpoint(ClientExport) + "registration")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result
 }
 
 func EditExport(args map[interface{}]interface{}) interface{} {
 	id := fulcro.GetKeyword(args, "id")
-	addressable := fulcro.GetMap(args, "addressable")
+	name := fulcro.GetString(args, "name")
 	export := Export{
 		Id: string(id),
 		Name: "",
 		Addr: Addressable{
 			Id:        "",
-			Name:      fulcro.GetString(addressable, "name"),
-			Address:   fulcro.GetString(addressable, "address"),
-			Protocol:  fulcro.GetString(addressable, "protocol"),
-			Port:      fulcro.GetInt(addressable, "port"),
-			Path:      fulcro.GetString(addressable, "path"),
-			Method:    fulcro.GetString(addressable, "method"),
-			Publisher: fulcro.GetString(addressable, "publisher"),
-			Topic:     fulcro.GetString(addressable, "topic"),
-			User:      fulcro.GetString(addressable, "user"),
-			Password:  fulcro.GetString(addressable, "password"),
+			Name:      name + "-addr",
+			Address:   fulcro.GetString(args, "address"),
+			Protocol:  fulcro.GetString(args, "protocol"),
+			Port:      fulcro.GetInt(args, "port"),
+			Path:      fulcro.GetString(args, "path"),
+			Method:    strings.ToUpper(string(fulcro.GetKeyword(args, "method"))),
+			Publisher: fulcro.GetString(args, "publisher"),
+			Topic:     fulcro.GetString(args, "topic"),
+			User:      fulcro.GetString(args, "user"),
+			Password:  fulcro.GetString(args, "password"),
+			Cert:      fulcro.GetString(args, "cert"),
+			Key:       fulcro.GetString(args, "key"),
 		},
 		Format:      fulcro.GetKeywordAsString(args, "format"),
 		Destination: fulcro.GetKeywordAsString(args, "destination"),
 		Compression: fulcro.GetKeywordAsString(args, "compression"),
 		Encrypt: Encryption{
 			EncryptionAlgorithm: fulcro.GetKeywordAsString(args, "encryptionAlgorithm"),
-			EncryptionKey:       fulcro.GetKeywordAsString(args, "encryptionKey"),
-			InitializingVector:  fulcro.GetKeywordAsString(args, "initializingVector"),
+			EncryptionKey:       fulcro.GetString(args, "encryptionKey"),
+			InitializingVector:  fulcro.GetString(args, "initializingVector"),
+		},
+		Filt: Filter{
+			DeviceIdentifiers: fulcro.GetStringSeq(args, "device-filter"),
+			ValueDescriptorIdentifiers: fulcro.GetStringSeq(args, "reading-filter"),
 		},
 		Enable: fulcro.GetBool(args, "enable"),
 	}
