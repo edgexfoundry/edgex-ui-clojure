@@ -321,7 +321,7 @@
   :new-addressable a/AddAddressableModal
   :edit-addressable a/EditAddressableModal
   :admin-status-modal dv/AdminStatusModal
-  :new-device dv/AddDeviceModal
+  :new-device dv/NewDeviceModal
   :set-command-modal cmd/SetCommandModal
   :new-notification nt/NotificationModal
   :new-subscription sb/SubscriptionModal
