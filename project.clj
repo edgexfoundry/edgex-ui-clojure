@@ -13,7 +13,6 @@
                  [com.wsscode/pathom "2.2.12"]
                  [ring/ring-defaults "0.3.2"]
                  [org.clojure/core.async "0.4.490"]
-                 [org.clojure/core.async "0.4.490"]
                  [garden "1.3.6"]
                  [mount "0.1.14"]
                  [hiccup "1.0.5"]
