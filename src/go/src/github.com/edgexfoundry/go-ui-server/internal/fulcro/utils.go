@@ -9,30 +9,38 @@ import (
 	"gopkg.in/resty.v1"
 )
 
-func Keywordize(data interface{}) interface{} {
-	var result interface{}
+func keywordize(data interface{}) interface{} {
+	var result interface{} = nil
 	switch v := data.(type) {
 	case []map[string]interface{}:
 		newArray := make([]map[transit.Keyword]interface{}, len(v))
 		for i, m := range v {
-			newArray[i] = Keywordize(m).(map[transit.Keyword]interface{})
+			newArray[i] = keywordize(m).(map[transit.Keyword]interface{})
 		}
 		result = newArray
 	case map[string]interface{}:
 		newMap := make(map[transit.Keyword]interface{})
 		for k, val := range v {
-			newMap[transit.Keyword(k)] = Keywordize(val)
+			newMap[transit.Keyword(k)] = keywordize(val)
 		}
 		result = newMap
 	case []interface{}:
 		for i, val := range v {
-			v[i] = Keywordize(val)
+			v[i] = keywordize(val)
 		}
 		result = v
 	default:
 		result = v
 	}
 	return result
+}
+
+func Keywordize(data interface{}, err error) (interface{}, error) {
+	var result interface{} = nil
+	if err == nil {
+		result = keywordize(data)
+	}
+	return result, err
 }
 
 func MakeKeyword(data interface{}, keys ...string) interface{} {

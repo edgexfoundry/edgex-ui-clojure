@@ -52,6 +52,13 @@
   (let [id-str (e/key-to-string id)]
     [{:yaml (e/edgex-get-path-raw :metadata (str "/deviceprofile/yaml/" id-str))}]))
 
+(defquery-root :q/login
+  (value [env params]
+         (timbre/log "attempt to login")
+         (try
+           (catch Exception ex
+             (throw (ex-info "Server error" {:type :fulcro.client.primitives/abort :status 401 :body "Unauthorized User"}))))))
+
 (defquery-root :q/edgex-devices
                (value [env params]
                       (e/edgex-get :metadata "device" e/convert-device)))

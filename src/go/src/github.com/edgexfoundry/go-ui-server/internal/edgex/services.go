@@ -8,100 +8,183 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"math"
-	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
-	"github.com/russolsen/transit"
+  "math"
+	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
+	"github.com/russolsen/transit"
+	"golang.org/x/crypto/bcrypt"
+
 	"gopkg.in/resty.v1"
 )
 
-func getDevices() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "device")
-	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "device")
-	result = fulcro.Remove(result, "profile", "deviceResources")
-	result = fulcro.Remove(result, "profile", "resources")
-	result = fulcro.Remove(result, "profile", "commands")
-	result = fulcro.MakeKeyword(result, "id")
-	result = fulcro.MakeKeyword(result, "adminState")
-	result = fulcro.MakeKeyword(result, "operatingState")
-	result = fulcro.MakeKeyword(result, "service", "adminState")
-	result = fulcro.MakeKeyword(result, "service", "operatingState")
-	result = fulcro.MakeKeyword(result, "profile", "id")
-	return result
+func Login(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	password := fulcro.GetString(args, "password")
+
+	saved, err := ioutil.ReadFile("./data/password")
+	if err != nil {
+		return nil, err
+	}
+	expectedPassword := string(saved)
+	// remove last '\n' character of expectedPassword
+	expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
+
+	incoming := []byte(password)
+	existing := []byte(expectedPassword)
+
+	if (bcrypt.CompareHashAndPassword(existing, incoming) != nil) {
+		return  nil, errors.New("Invalid Password")
+	}
+	return nil, nil
 }
 
-func Devices(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ChangePassword(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	oldpw := fulcro.GetString(args, "oldpw")
+	newpw := fulcro.GetString(args, "newpw")
+
+	saved, err := ioutil.ReadFile("./data/password")
+	if err != nil {
+		return nil, err
+	}
+	expectedPassword := string(saved)
+	// remove last '\n' character of expectedPassword
+	expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
+
+	incoming := []byte(oldpw)
+	existing := []byte(expectedPassword)
+
+	err = bcrypt.CompareHashAndPassword(existing, incoming)
+	if err != nil {
+		return  nil, errors.New("Invalid Current Password")
+	}
+
+	modifying := []byte(newpw)
+	hashedBytes, err := bcrypt.GenerateFromPassword(modifying, bcrypt.DefaultCost)
+	if err != nil {
+		return  nil, err
+	}
+	err = ioutil.WriteFile("./data/password", hashedBytes, 0644)
+	if err != nil {
+		return  nil, err
+	}
+	return nil, nil
+}
+
+func getDevices() (interface{}, error) {
+	var data []map[string]interface{}
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "device")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "device")
+		result = fulcro.Remove(result, "profile", "deviceResources")
+		result = fulcro.Remove(result, "profile", "resources")
+		result = fulcro.Remove(result, "profile", "commands")
+		result = fulcro.MakeKeyword(result, "id")
+		result = fulcro.MakeKeyword(result, "adminState")
+		result = fulcro.MakeKeyword(result, "operatingState")
+		result = fulcro.MakeKeyword(result, "service", "adminState")
+		result = fulcro.MakeKeyword(result, "service", "operatingState")
+		result = fulcro.MakeKeyword(result, "profile", "id")
+	}
+	return result, err
+}
+
+func Devices(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	return fulcro.Keywordize(getDevices())
 }
 
-func getDeviceServices() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "deviceservice")
+func getDeviceServices() (interface{}, error) {
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "device-service")
-	result = fulcro.MakeKeyword(result, "id")
-	result = fulcro.MakeKeyword(result, "adminState")
-	result = fulcro.MakeKeyword(result, "operatingState")
-	result = fulcro.MakeKeyword(result, "addressable", "id")
-	return result
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "deviceservice")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "device-service")
+		result = fulcro.MakeKeyword(result, "id")
+		result = fulcro.MakeKeyword(result, "adminState")
+		result = fulcro.MakeKeyword(result, "operatingState")
+		result = fulcro.MakeKeyword(result, "addressable", "id")
+	}
+	return result, err
 }
 
-func DeviceServices(params []interface{}, args map[interface{}]interface{}) interface{} {
+func DeviceServices(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	return fulcro.Keywordize(getDeviceServices())
 }
 
-func ScheduleEvents(params []interface{}, args map[interface{}]interface{}) interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "scheduleevent")
+func ScheduleEvents(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "schedule-event")
-	result = fulcro.MakeKeyword(result, "id")
-	result = fulcro.MakeKeyword(result, "adminState")
-	result = fulcro.MakeKeyword(result, "operatingState")
-	result = fulcro.MakeKeyword(result, "addressable", "id")
-	result = fulcro.Keywordize(result)
-	return result
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "scheduleevent")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result := fulcro.AddType(data, "schedule-event")
+		result = fulcro.MakeKeyword(result, "id")
+		result = fulcro.MakeKeyword(result, "adminState")
+		result = fulcro.MakeKeyword(result, "operatingState")
+		result = fulcro.MakeKeyword(result, "addressable", "id")
+	}
+	return fulcro.Keywordize(result, err)
 }
 
-func getAddressables() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "addressable")
+func getAddressables() (interface{}, error) {
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "addressable")
-	result = fulcro.MakeKeyword(result, "id")
-	return result
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "addressable")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "addressable")
+		result = fulcro.MakeKeyword(result, "id")
+	}
+	return result, err
 }
 
-func Addressables(params []interface{}, args map[interface{}]interface{}) interface{} {
+func Addressables(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	return fulcro.Keywordize(getAddressables())
 }
 
-func getProfiles() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "deviceprofile")
+func getProfiles() (interface{}, error) {
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "device-profile")
-	result = fulcro.MakeKeyword(result, "id")
-	return result
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "deviceprofile")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "device-profile")
+		result = fulcro.MakeKeyword(result, "id")
+	}
+	return result, err
 }
 
 func doGet(getInfo interface{}) interface{} {
 	var data map[string]interface{}
+	var result [][2]string
 	info := getInfo.(map[string]interface{})
 	url := info["url"].(string)
 	resp, _ := resty.R().Get(url)
 	json.Unmarshal(resp.Body(), &data)
-	result := make([][2]string, len(data))
-	pos := 0
-	for k, v := range data {
-		result[pos] = [2]string{k, v.(string)}
-		pos++
+	readings, _ := data["readings"]
+	rds := readings.([]interface{})
+	result = make([][2]string, len(rds))
+	for i, r := range rds {
+		reading := r.(map[string]interface{})
+		result[i] = [2]string{reading["name"].(string), fmt.Sprintf("%v", reading["value"])}
 	}
 	return result
 }
@@ -148,29 +231,31 @@ func applyGets(data interface{}) interface{} {
 	return result
 }
 
-func getCommands(id transit.Keyword) interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientCommand) + "device/" + string(id))
+func getCommands(id transit.Keyword) (interface{}, error) {
 	var data map[string]interface{}
 	var result interface{}
-	json.Unmarshal(resp.Body(), &data)
-	commands := data["commands"].([]interface{})
-	result = make([]map[string]interface{}, len(commands))
-	for i, cmd := range commands {
-		result.([]map[string]interface{})[i] = cmd.(map[string]interface{})
+
+	resp, err := resty.R().Get(getEndpoint(ClientCommand) + "device/" + string(id))
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		commands := data["commands"].([]interface{})
+		result = make([]map[string]interface{}, len(commands))
+		for i, cmd := range commands {
+			result.([]map[string]interface{})[i] = cmd.(map[string]interface{})
+		}
+		result = fulcro.AddType(result, ClientCommand)
+		result = fulcro.MakeKeyword(result, "id")
+		result = applyGets(result)
 	}
-	result = fulcro.AddType(result, ClientCommand)
-	result = fulcro.MakeKeyword(result, "id")
-	result = applyGets(result)
-	return result
+	return result, err
 }
 
-func Commands(params []interface{}, args map[interface{}]interface{}) interface{} {
-	id := fulcro.GetKeyword(args, "id")
-	result := getCommands(id)
-	return fulcro.Keywordize(result)
+func Commands(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	return fulcro.Keywordize(getCommands(fulcro.GetKeyword(args, "id")))
 }
 
-func getReadingsInTimeRange(name string, from int64, to int64) interface{} {
+func getReadingsInTimeRange(name string, from int64, to int64) (interface{}, error) {
 	const batchSize = 100
 	const maxRequests = 100
 	result := make([]interface{}, batchSize * maxRequests)
@@ -182,12 +267,17 @@ func getReadingsInTimeRange(name string, from int64, to int64) interface{} {
 	var count int
 	for ok := true; ok; ok = (count == batchSize) && (limit > 0) {
 		fromStr := strconv.FormatInt(from, 10)
-		resp, _ := resty.R().Get(getEndpoint(ClientData) + "reading/" + fromStr + "/" + toStr + "/" + batchStr)
+		resp, err := resty.R().Get(getEndpoint(ClientData) + "reading/" + fromStr + "/" + toStr + "/" + batchStr)
+		if err != nil {
+			return nil, err
+		}
 		var data []map[string]interface{}
 		json.Unmarshal(resp.Body(), &data)
 		readings := fulcro.AddType(data, "reading").([]map[string]interface{})
 		count = len(readings)
-		from = int64(readings[count-1]["created"].(float64))
+		if (count > 0) {
+			from = int64(readings[count-1]["created"].(float64))
+		}
 		for _, reading := range readings {
 			if reading["device"].(string) != name {
 				continue
@@ -212,28 +302,35 @@ func getReadingsInTimeRange(name string, from int64, to int64) interface{} {
 		}
 		limit--
 	}
-	return result[:pos]
+	return result[:pos], nil
 }
 
-func DeviceReadings(params []interface{}, args map[interface{}]interface{}) interface{} {
+func DeviceReadings(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	name := fulcro.GetString(args, "name")
 	from := fulcro.GetInt(args, "from")
 	to := fulcro.GetInt(args, "to")
 	return fulcro.Keywordize(getReadingsInTimeRange(name, from, to))
 }
 
-func Profiles(params []interface{}, args map[interface{}]interface{}) interface{} {
+func Profiles(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	return fulcro.Keywordize(getProfiles())
 }
 
-func ProfileYaml(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ProfileYaml(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
+	var err error
+
 	id := fulcro.GetKeyword(args, "id")
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "deviceprofile/yaml/" + string(id))
-	m := make(map[string]interface{})
-	m["yaml"] = resp.String()
-	result := make([]interface{}, 1)
-	result[0] = m
-	return fulcro.Keywordize(result)
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "deviceprofile/yaml/" + string(id))
+
+	if err == nil {
+		m := make(map[string]interface{})
+		m["yaml"] = resp.String()
+		arr := make([]interface{}, 1)
+		arr[0] = m
+		result = arr
+	}
+	return fulcro.Keywordize(result, err)
 }
 
 func addDefault(data interface{}, keys ...string) interface{} {
@@ -249,32 +346,46 @@ func addDefault(data interface{}, keys ...string) interface{} {
 	return schedules
 }
 
-func getSchedules() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "schedule")
+func getSchedules() (interface{}, error) {
+	var result interface{}
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "schedule")
-	result = fulcro.MakeKeyword(result, "id")
-	result = addDefault(result, "start", "end")
-	return result
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "schedule")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "schedule")
+		result = fulcro.MakeKeyword(result, "id")
+		result = addDefault(result, "start", "end")
+	}
+	return result, err
 }
 
-func getScheduleEvents() interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientMetadata) + "scheduleevent")
+func getScheduleEvents() (interface{}, error) {
+	var result interface{}
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	result := fulcro.AddType(data, "schedule-event")
-	result = fulcro.MakeKeyword(result, "id")
-	result = fulcro.MakeKeyword(result, "addressable", "id")
-	return result
+
+	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "scheduleevent")
+
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "schedule-event")
+		result = fulcro.MakeKeyword(result, "id")
+		result = fulcro.MakeKeyword(result, "addressable", "id")
+	}
+	return result, err
 }
 
-func ShowSchedules(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowSchedules(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
 	result := make(map[string]interface{})
-	result["content"] = getSchedules()
-	result["events"] = getScheduleEvents()
-	return fulcro.Keywordize(result)
+	result["content"], err = getSchedules()
+	if err == nil {
+		result["events"], err = getScheduleEvents()
+	}
+	return fulcro.Keywordize(result, err)
 }
+
 func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string, slug string) (interface{}, error) {
 	const batchSize = 100
 	const maxRequests = 100
@@ -334,16 +445,17 @@ func getNotifyInTimeRange(from int64, to int64, notifyType string, keys []string
 	return result[:pos], nil
 }
 
-func ShowNotifications(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowNotifications(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	result := make(map[string]interface{})
 	start := fulcro.GetInt(args, "start")
 	end := fulcro.GetInt(args, "end")
+	var err error
 	keys := []string{"id", "category", "severity", "status"}
-	result["content"], _ = getNotifyInTimeRange(start, end, "notification", keys, "")
-	return fulcro.Keywordize(result)
+	result["content"], err = getNotifyInTimeRange(start, end, "notification", keys, "")
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	var data []map[string]interface{}
 	result := make(map[string]interface{})
 	resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "subscription")
@@ -354,14 +466,15 @@ func ShowSubscriptions(params []interface{}, args map[interface{}]interface{}) i
 		subscriptions = fulcro.MakeKeyword(subscriptions, "id")
 		result["content"] = subscriptions
 	}
-	return fulcro.Keywordize(result)
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	result := make(map[string]interface{})
 	slug := fulcro.GetString(args, "slug")
 	var start int64
 	var end int64
+  var err error
 
 	if slug != "" {
 		// show the transmissions from a week ago till now if get by slug
@@ -372,170 +485,62 @@ func ShowTransmissions(params []interface{}, args map[interface{}]interface{}) i
 		end = fulcro.GetInt(args, "end")
 	}
 	keys := []string{"id", "status"}
-	result["content"], _ = getNotifyInTimeRange(start, end, "transmission", keys, slug)
-	return fulcro.Keywordize(result)
+	result["content"], err = getNotifyInTimeRange(start, end, "transmission", keys, slug)
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowExports(params []interface{}, args map[interface{}]interface{}) interface{} {
-	resp, _ := resty.R().Get(getEndpoint(ClientExport) + "registration")
+func ShowExports(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	var data []map[string]interface{}
-	json.Unmarshal(resp.Body(), &data)
-	exports := fulcro.AddType(data, ClientExport)
-	exports = fulcro.MakeKeyword(exports, "id")
-	exports = fulcro.MakeKeyword(exports, "destination")
-	exports = fulcro.MakeKeyword(exports, "format")
-	exports = fulcro.MakeKeyword(exports, "compression")
-	exports = fulcro.MakeKeyword(exports, "encryption", "encryptionAlgorithm")
 	result := make(map[string]interface{})
-	result["content"] = exports
-	return fulcro.Keywordize(result)
-}
 
-type Notification struct {
-	Id          string `json:"id,omitempty"`
-	Slug        string `json:"slug"`
-	Sender      string `json:"sender"`
-	Category    string `json:"category"`
-	Severity    string `json:"severity"`
-	Content     string `json:"content"`
-	Description string `json:"description,omitempty"`
-	Labels    []string `json:"labels"`
-}
-
-func AddNotification(args map[interface{}]interface{}) interface{} {
-	var result interface{}
-	tempid := fulcro.GetTempId(args, "tempid")
-	notify := Notification{
-		Id: "",
-		Slug: fulcro.GetString(args, "slug"),
-		Description: fulcro.GetString(args, "description"),
-		Sender: fulcro.GetString(args, "sender"),
-		Category: fulcro.GetKeywordAsString(args, "category"),
-		Severity: fulcro.GetKeywordAsString(args, "severity"),
-		Content: fulcro.GetString(args,"content"),
-		Labels: fulcro.GetStringSeq(args, "labels"),
-	}
-	resp, err := resty.R().SetBody(notify).Post(getEndpoint(ClientNotifications) + "notification")
+	resp, err := resty.R().Get(getEndpoint(ClientExport) + "registration")
 	if err == nil {
-		result = fulcro.MkTempIdResult(tempid, resp)
+		json.Unmarshal(resp.Body(), &data)
+		exports := fulcro.AddType(data, "export")
+		exports = fulcro.MakeKeyword(exports, "id")
+		exports = fulcro.MakeKeyword(exports, "destination")
+		exports = fulcro.MakeKeyword(exports, "format")
+		exports = fulcro.MakeKeyword(exports, "compression")
+		exports = fulcro.MakeKeyword(exports, "encryption", "encryptionAlgorithm")
+		result["content"] = exports
 	}
-	return result
+	return fulcro.Keywordize(result, err)
 }
 
-type Channel struct {
-	Type            string `json:"type,omitempty"`  // REST or EMAIL
-	MailAddresses []string    `json:"mailAddresses,omitempty"`
-	Url             string `json:"url,omitempty"`
+func ShowProfiles(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+	result["content"], err = getProfiles()
+	return fulcro.Keywordize(result, err)
 }
 
-type Subscription struct {
-	Id                     string `json:"id,omitempty"`
-	Slug                   string `json:"slug"`
-	Receiver               string `json:"receiver"`
-	Description            string `json:"description,omitempty"`
-	SubscribedCategories []string `json:"subscribedCategories,omitempty"`
-	SubscribedLabels     []string `json:"subscribedLabels,omitempty"`
-	Channels             []interface{} `json:"channels"`
-}
-
-func AddSubscription(args map[interface{}]interface{}) interface{} {
-	var result interface{}
-	tempid := fulcro.GetTempId(args, "tempid")
-	slug := fulcro.GetString(args, "slug")
-
-	subscription := Subscription{
-		Id: "",
-		Slug: slug,
-		Description: fulcro.GetString(args, "description"),
-		Receiver: fulcro.GetString(args, "receiver"),
-		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
-		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
-		Channels: getChannelSeq(args, "channels"),
-	}
-	_, err := resty.R().SetBody(subscription).Post(getEndpoint(ClientNotifications) + "subscription")
+func ShowDevices(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
+	result := make(map[string]interface{})
+	result["content"], err = getDevices()
 	if err == nil {
-		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
-		if err == nil {
-			var data map[string]interface{}
-			json.Unmarshal(resp.Body(), &data)
-			id := data["id"].(string)
-			result = fulcro.MkTempResult(tempid, transit.Keyword(id))
-		}
+		result["services"], err = getDeviceServices()
 	}
-	return result
-}
-
-func EditSubscription(args map[interface{}]interface{}) interface{} {
-	id := fulcro.GetKeyword(args, "id")
-	subscription := Subscription{
-		Id: string(id),
-		Slug: fulcro.GetString(args, "slug"),
-		Description: fulcro.GetString(args, "description"),
-		Receiver: fulcro.GetString(args, "receiver"),
-		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
-		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
-		Channels: getChannelSeq(args, "channels"),
+	if err == nil {
+		result["schedules"], err = getSchedules()
 	}
-	resty.R().SetBody(subscription).Put(getEndpoint(ClientNotifications) + "subscription")
-	return id
-}
-
-func DeleteSubscription(args map[interface{}]interface{}) interface{} {
-	slug := fulcro.GetString(args, "slug")
-	resty.R().Delete(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
-	return slug
-}
-
-func getChannelSeq(args map[interface{}]interface{}, id string) []interface{} {
-	outer := args[transit.Keyword(id)].([]interface{})
-	result := make([]interface{}, len(outer))
-	for i, s := range outer {
-		seq := s.(map[interface{}]interface{})
-		var channel Channel
-		for key, v := range seq {
-			switch key {
-			case transit.Keyword("type"):
-				channel.Type = v.(string)
-			case transit.Keyword("url"):
-				channel.Url = v.(string)
-			case transit.Keyword("mailAddresses"):
-				arr := v.([]interface{})
-				emails := make([]string, len(arr))
-				for j, email := range arr {
-					emails[j] = email.(string)
-				}
-				//channel.MailAddresses = v.([]string)
-				channel.MailAddresses = emails
-			}
-		}
-		result[i] = channel
+	if err == nil {
+		result["addressables"], err = getAddressables()
 	}
-	return result
+	if err == nil {
+		result["profiles"], err = getProfiles()
+	}
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowProfiles(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowAddressables(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
 	result := make(map[string]interface{})
-	result["content"] = getProfiles()
-	return fulcro.Keywordize(result)
+	result["content"], err = getAddressables()
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowDevices(params []interface{}, args map[interface{}]interface{}) interface{} {
-	result := make(map[string]interface{})
-	result["content"] = getDevices()
-	result["services"] = getDeviceServices()
-	result["schedules"] = getSchedules()
-	result["addressables"] = getAddressables()
-	result["profiles"] = getProfiles()
-	return fulcro.Keywordize(result)
-}
-
-func ShowAddressables(params []interface{}, args map[interface{}]interface{}) interface{} {
-	result := make(map[string]interface{})
-	result["content"] = getAddressables()
-	return fulcro.Keywordize(result)
-}
-
-func getLogsInTimeRange(from int64, to int64) interface{} {
+func getLogsInTimeRange(from int64, to int64) (interface{}, error) {
 	const batchSize = 100
 	const maxRequests = 100
 	result := make([]interface{}, batchSize * maxRequests)
@@ -547,7 +552,12 @@ func getLogsInTimeRange(from int64, to int64) interface{} {
 	var count int
 	for ok := true; ok; ok = (count == batchSize) && (limit > 0) {
 		fromStr := strconv.FormatInt(from, 10)
-		resp, _ := resty.R().Get(getEndpoint(ClientLogging) + "logs/" + fromStr + "/" + toStr + "/" + batchStr)
+		resp, err := resty.R().Get(getEndpoint(ClientLogging) + "logs/" + fromStr + "/" + toStr + "/" + batchStr)
+
+		if err != nil {
+			return nil, err
+		}
+
 		var data []map[string]interface{}
 		json.Unmarshal(resp.Body(), &data)
 		logs := fulcro.AddType(data, "log-entry").([]map[string]interface{})
@@ -576,57 +586,76 @@ func getLogsInTimeRange(from int64, to int64) interface{} {
 		}
 		limit--
 	}
-	return result[:pos]
+	return result[:pos], nil
 }
 
-func ShowLogs(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowLogs(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
 	start := fulcro.GetInt(args, "start")
 	end := fulcro.GetInt(args, "end")
 	result := make(map[string]interface{})
-	result["content"] = getLogsInTimeRange(start, end)
-	return fulcro.Keywordize(result)
+	result["content"], err = getLogsInTimeRange(start, end)
+	return fulcro.Keywordize(result, err)
 }
 
-func ShowCommands(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ShowCommands(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
 	id := fulcro.GetKeyword(args, "id")
 	result := make(map[string]interface{})
 	result["source-device"] = id
-	result["commands"] = getCommands(id)
-	return fulcro.Keywordize(result)
+	result["commands"], err = getCommands(id)
+	return fulcro.Keywordize(result, err)
 }
 
-func ReadingPage(params []interface{}, args map[interface{}]interface{}) interface{} {
+func ReadingPage(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	var err error
 	result := make(map[string]interface{})
-	result["devices"] = getDevices()
-	return fulcro.Keywordize(result)
+	result["devices"], err = getDevices()
+	return fulcro.Keywordize(result, err)
 }
 
-func UpdateLockMode(args map[interface{}]interface{}) interface{} {
+func UpdateLockMode(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	mode := fulcro.GetKeyword(args, "mode")
-	resty.R().Put(getEndpoint(ClientCommand) + "device/" + string(id) + "/adminstate/" + string(mode))
-	return id
+	_, err := resty.R().Put(getEndpoint(ClientCommand) + "device/" + string(id) + "/adminstate/" + string(mode))
+	return id, err
 }
 
-func UploadProfile(args map[interface{}]interface{}) interface{} {
+func UploadProfile(args map[interface{}]interface{}) (interface{}, error) {
 	fileId := fulcro.GetInt(args, "file-id")
 	fileName := "tmp-" + strconv.FormatInt(fileId, 10)
-	resty.R().
+	_, err := resty.R().
 		SetHeader("Content-Type", "application/x-yaml").
 		SetFile("file", fileName).
 		Post(getEndpoint(ClientMetadata) + "deviceprofile/uploadfile")
 	os.Remove(fileName)
-	return fileId
+	return fileId, err
 }
 
-func DeleteProfile(args map[interface{}]interface{}) interface{} {
+func DeleteProfile(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientMetadata) + "deviceprofile/id/" + string(id))
-	return id
+	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "deviceprofile/id/" + string(id))
+	return id, err
 }
 
 type Named struct {
 	Name string `json:"name"`
+}
+
+type Addressable struct {
+	Id        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	Address   string `json:"address"`
+	Protocol  string `json:"protocol,omitempty"`
+	Port      int64  `json:"port,omitempty"`
+	Path      string `json:"path"`
+	Method    string `json:"method,omitempty"`
+	Publisher string `json:"publisher,omitempty"`
+	Topic     string `json:"topic,omitempty"`
+	User      string `json:"user,omitempty"`
+	Password  string `json:"password,omitempty"`
+	Cert      string `json:"cert,omitempty"`
+	Key       string `json:"key,omitempty"`
 }
 
 type Device struct {
@@ -641,7 +670,7 @@ type Device struct {
 	Protocols      map[string]interface{} `json:"protocols"`
 }
 
-func AddDevice(args map[interface{}]interface{}) interface{} {
+func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 	name := fulcro.GetString(args, "name")
 	description := fulcro.GetString(args, "description")
 	labels := fulcro.GetStringSeq(args, "labels")
@@ -685,12 +714,12 @@ func AddDevice(args map[interface{}]interface{}) interface{} {
 	}
 	_, err := resty.R().SetBody(addressable).Post(getEndpoint(ClientMetadata) + "addressable")
 	if err == nil {
-		resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
+		_, err = resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
 	}
-	return nil
+	return nil, err
 }
 
-func DeleteDevice(args map[interface{}]interface{}) interface{} {
+func DeleteDevice(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "device/" + string(id))
 	if err == nil {
@@ -704,26 +733,11 @@ func DeleteDevice(args map[interface{}]interface{}) interface{} {
 			_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "addressable/id/" + addressableId)
 		}
 	}
-	return id
+	return id, err
 }
 
-type Addressable struct {
-	Id        string `json:"id,omitempty"`
-	Name      string `json:"name,omitempty"`
-	Address   string `json:"address"`
-	Protocol  string `json:"protocol"`
-	Port      int64  `json:"port"`
-	Path      string `json:"path"`
-	Method    string `json:"method"`
-	Publisher string `json:"publisher"`
-	Topic     string `json:"topic"`
-	User      string `json:"user"`
-	Password  string `json:"password"`
-	Cert      string `json:"cert,omitempty"`
-	Key       string `json:"key,omitempty"`
-}
-
-func AddAddressable(args map[interface{}]interface{}) interface{} {
+func AddAddressable(args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
 	name := fulcro.GetString(args, "name")
 	address := fulcro.GetString(args, "address")
@@ -735,6 +749,8 @@ func AddAddressable(args map[interface{}]interface{}) interface{} {
 	topic := fulcro.GetString(args, "topic")
 	user := fulcro.GetString(args, "user")
 	password := fulcro.GetString(args, "password")
+	cert := fulcro.GetString(args, "cert")
+	key := fulcro.GetString(args, "key")
 	addressable := Addressable{
 		Id:        "",
 		Name:      name,
@@ -747,12 +763,17 @@ func AddAddressable(args map[interface{}]interface{}) interface{} {
 		Topic:     topic,
 		User:      user,
 		Password:  password,
+		Cert:      cert,
+		Key:       key,
 	}
-	resp, _ := resty.R().SetBody(addressable).Post(getEndpoint(ClientMetadata) + "addressable")
-	return fulcro.MkTempIdResult(tempid, resp)
+	resp, err := resty.R().SetBody(addressable).Post(getEndpoint(ClientMetadata) + "addressable")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result, err
 }
 
-func EditAddressable(args map[interface{}]interface{}) interface{} {
+func EditAddressable(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	address := fulcro.GetString(args, "address")
 	protocol := fulcro.GetString(args, "protocol")
@@ -763,6 +784,8 @@ func EditAddressable(args map[interface{}]interface{}) interface{} {
 	topic := fulcro.GetString(args, "topic")
 	user := fulcro.GetString(args, "user")
 	password := fulcro.GetString(args, "password")
+	cert := fulcro.GetString(args, "cert")
+	key := fulcro.GetString(args, "key")
 	addressable := Addressable{
 		Id:        string(id),
 		Name:      "",
@@ -775,30 +798,33 @@ func EditAddressable(args map[interface{}]interface{}) interface{} {
 		Topic:     topic,
 		User:      user,
 		Password:  password,
+		Cert:      cert,
+		Key:       key,
 	}
-	resty.R().SetBody(addressable).Put(getEndpoint(ClientMetadata) + "addressable")
-	return id
+	_, err := resty.R().SetBody(addressable).Put(getEndpoint(ClientMetadata) + "addressable")
+	return id, err
 }
 
-func DeleteAddressable(args map[interface{}]interface{}) interface{} {
+func DeleteAddressable(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientMetadata) + "addressable/id/" + string(id))
-	return id
+	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "addressable/id/" + string(id))
+	return id, err
 }
 
 type Schedule struct {
 	Name      string `json:"name,omitempty"`
-	Start     int64  `json:"start"`
-	End       int64  `json:"end"`
+	Start     string `json:"start"`
+	End       string `json:"end"`
 	Frequency string `json:"frequency"`
 	RunOnce   bool   `json:"run-once"`
 }
 
-func AddSchedule(args map[interface{}]interface{}) interface{} {
+func AddSchedule(args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
 	name := fulcro.GetString(args, "name")
-	start := fulcro.GetInt(args, "start")
-	end := fulcro.GetInt(args, "end")
+	start := fulcro.GetString(args, "start")
+	end := fulcro.GetString(args, "end")
 	frequency := fulcro.GetString(args, "frequency")
 	runOnce := fulcro.GetBool(args, "run-once")
 	schedule := Schedule{
@@ -808,14 +834,17 @@ func AddSchedule(args map[interface{}]interface{}) interface{} {
 		Frequency: frequency,
 		RunOnce:   runOnce,
 	}
-	resp, _ := resty.R().SetBody(schedule).Post(getEndpoint(ClientMetadata) + "schedule")
-	return fulcro.MkTempIdResult(tempid, resp)
+	resp, err := resty.R().SetBody(schedule).Post(getEndpoint(ClientMetadata) + "schedule")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result, err
 }
 
-func DeleteSchedule(args map[interface{}]interface{}) interface{} {
+func DeleteSchedule(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientMetadata) + "schedule/id/" + string(id))
-	return id
+	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "schedule/id/" + string(id))
+	return id, err
 }
 
 type ScheduleEvent struct {
@@ -826,7 +855,8 @@ type ScheduleEvent struct {
 	Service     string `json:"service"`
 }
 
-func AddScheduleEvent(args map[interface{}]interface{}) interface{} {
+func AddScheduleEvent(args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
 	name := fulcro.GetString(args, "name")
 	addressableName := fulcro.GetString(args, "addressable-name")
@@ -840,14 +870,17 @@ func AddScheduleEvent(args map[interface{}]interface{}) interface{} {
 		Schedule:    schedule,
 		Service:     service,
 	}
-	resp, _ := resty.R().SetBody(scheduleEvent).Post(getEndpoint(ClientMetadata) + "scheduleevent")
-	return fulcro.MkTempIdResult(tempid, resp)
+	resp, err := resty.R().SetBody(scheduleEvent).Post(getEndpoint(ClientMetadata) + "scheduleevent")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result, err
 }
 
-func DeleteScheduleEvent(args map[interface{}]interface{}) interface{} {
+func DeleteScheduleEvent(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientMetadata) + "scheduleevent/id/" + string(id))
-	return id
+	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "scheduleevent/id/" + string(id))
+	return id, err
 }
 
 type Encryption struct {
@@ -873,7 +906,7 @@ type Export struct {
 	Enable      bool `json:"enable"`
 }
 
-func AddExport(args map[interface{}]interface{}) interface{} {
+func AddExport(args map[interface{}]interface{}) (interface{}, error) {
 	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
 	name := fulcro.GetString(args, "name")
@@ -913,10 +946,10 @@ func AddExport(args map[interface{}]interface{}) interface{} {
 	if err == nil {
 		result = fulcro.MkTempIdResult(tempid, resp)
 	}
-	return result
+	return result, err
 }
 
-func EditExport(args map[interface{}]interface{}) interface{} {
+func EditExport(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	name := fulcro.GetString(args, "name")
 	export := Export{
@@ -951,14 +984,136 @@ func EditExport(args map[interface{}]interface{}) interface{} {
 		},
 		Enable: fulcro.GetBool(args, "enable"),
 	}
-	resty.R().SetBody(export).Put(getEndpoint(ClientExport) + "registration")
-	return id
+	_, err := resty.R().SetBody(export).Put(getEndpoint(ClientExport) + "registration")
+	return id, err
 }
 
-func DeleteExport(args map[interface{}]interface{}) interface{} {
+func DeleteExport(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resty.R().Delete(getEndpoint(ClientExport) + "registration/id/" + string(id))
-	return id
+	_, err := resty.R().Delete(getEndpoint(ClientExport) + "registration/id/" + string(id))
+	return id, err
+}
+
+type Notification struct {
+	Id          string `json:"id,omitempty"`
+	Slug        string `json:"slug"`
+	Sender      string `json:"sender"`
+	Category    string `json:"category"`
+	Severity    string `json:"severity"`
+	Content     string `json:"content"`
+	Description string `json:"description,omitempty"`
+	Labels    []string `json:"labels"`
+}
+
+func AddNotification(args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
+	tempid := fulcro.GetTempId(args, "tempid")
+	notify := Notification{
+		Id: "",
+		Slug: fulcro.GetString(args, "slug"),
+		Description: fulcro.GetString(args, "description"),
+		Sender: fulcro.GetString(args, "sender"),
+		Category: fulcro.GetString(args, "category"),
+		Severity: fulcro.GetString(args, "severity"),
+		Content: fulcro.GetString(args,"content"),
+		Labels: fulcro.GetStringSeq(args, "labels"),
+	}
+	resp, err := resty.R().SetBody(notify).Post(getEndpoint(ClientNotifications) + "notification")
+	if err == nil {
+		result = fulcro.MkTempIdResult(tempid, resp)
+	}
+	return result, err
+}
+
+type Channel struct {
+	Type            string `json:"type,omitempty"`  // REST or EMAIL
+	MailAddresses []string    `json:"mailAddresses,omitempty"`
+	Url             string `json:"url,omitempty"`
+}
+
+type Subscription struct {
+	Id                     string `json:"id,omitempty"`
+	Slug                   string `json:"slug"`
+	Receiver               string `json:"receiver"`
+	Description            string `json:"description,omitempty"`
+	SubscribedCategories []string `json:"subscribedCategories,omitempty"`
+	SubscribedLabels     []string `json:"subscribedLabels,omitempty"`
+	Channels             []interface{} `json:"channels"`
+}
+
+func AddSubscription(args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
+	tempid := fulcro.GetTempId(args, "tempid")
+	slug := fulcro.GetString(args, "slug")
+
+	subscription := Subscription{
+		Id: "",
+		Slug: slug,
+		Description: fulcro.GetString(args, "description"),
+		Receiver: fulcro.GetString(args, "receiver"),
+		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
+		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
+		Channels: getChannelSeq(args, "channels"),
+	}
+	_, err := resty.R().SetBody(subscription).Post(getEndpoint(ClientNotifications) + "subscription")
+	if err == nil {
+		resp, err := resty.R().Get(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
+		if err == nil {
+			var data map[string]interface{}
+			json.Unmarshal(resp.Body(), &data)
+			id := data["id"].(string)
+			result = fulcro.MkTempResult(tempid, transit.Keyword(id))
+		}
+	}
+	return result, err
+}
+
+func EditSubscription(args map[interface{}]interface{}) (interface{}, error) {
+	id := fulcro.GetKeyword(args, "id")
+	subscription := Subscription{
+		Id: string(id),
+		Slug: fulcro.GetString(args, "slug"),
+		Description: fulcro.GetString(args, "description"),
+		Receiver: fulcro.GetString(args, "receiver"),
+		SubscribedCategories: fulcro.GetStringSeq(args, "subscribedCategories"),
+		SubscribedLabels: fulcro.GetStringSeq(args, "subscribedLabels"),
+		Channels: getChannelSeq(args, "channels"),
+	}
+	_, err := resty.R().SetBody(subscription).Put(getEndpoint(ClientNotifications) + "subscription")
+	return id, err
+}
+
+func DeleteSubscription(args map[interface{}]interface{}) (interface{}, error) {
+	slug := fulcro.GetString(args, "slug")
+	_, err := resty.R().Delete(getEndpoint(ClientNotifications) + "subscription/slug/" + slug)
+	return slug, err
+}
+
+func getChannelSeq(args map[interface{}]interface{}, id string) []interface{} {
+	outer := args[transit.Keyword(id)].([]interface{})
+	result := make([]interface{}, len(outer))
+	for i, s := range outer {
+		seq := s.(map[interface{}]interface{})
+		var channel Channel
+		for key, v := range seq {
+			switch key {
+			case transit.Keyword("type"):
+				channel.Type = v.(string)
+			case transit.Keyword("url"):
+				channel.Url = v.(string)
+			case transit.Keyword("mailAddresses"):
+				arr := v.([]interface{})
+				emails := make([]string, len(arr))
+				for j, email := range arr {
+					emails[j] = email.(string)
+				}
+				//channel.MailAddresses = v.([]string)
+				channel.MailAddresses = emails
+			}
+		}
+		result[i] = channel
+	}
+	return result
 }
 
 func getValueSeq(args map[interface{}]interface{}, id string) [][]interface{} {
@@ -974,13 +1129,13 @@ func getValueSeq(args map[interface{}]interface{}, id string) [][]interface{} {
 	return result
 }
 
-func IssueSetCommand(args map[interface{}]interface{}) interface{} {
+func IssueSetCommand(args map[interface{}]interface{}) (interface{}, error) {
 	url := fulcro.GetString(args, "url")
 	values := getValueSeq(args, "values")
 	data := make(map[string]interface{}, len(values))
 	for _, v := range values {
 		data[v[0].(string)] = v[2]
 	}
-	resty.R().SetBody(data).Put(url)
-	return nil
+	_, err := resty.R().SetBody(data).Put(url)
+	return nil, err
 }

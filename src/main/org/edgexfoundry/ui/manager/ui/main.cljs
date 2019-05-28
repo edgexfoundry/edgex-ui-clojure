@@ -57,12 +57,3 @@
   :schedule-event sc/ScheduleEventInfo)
 
 (def ui-device-list-or-info (prim/factory DeviceListOrInfoRouter))
-
-(defsc MainPage [this {:keys [device-data]}]
-  {:query [{:device-data (prim/get-query DeviceListOrInfoRouter)}]
-   :ident (fn [] co/device-page-ident)
-   :initial-state (fn [p] {:device-data (prim/get-initial-state DeviceListOrInfoRouter nil)})}
-  (dom/div nil
-           (ui-device-list-or-info device-data)))
-
-(def ui-main-page (prim/factory MainPage))

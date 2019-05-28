@@ -8,16 +8,15 @@ import (
 	"container/list"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/russolsen/transit"
 )
 
-type QueryFunc func(params []interface{}, args map[interface{}]interface{}) interface{}
+type QueryFunc func(params []interface{}, args map[interface{}]interface{}) (interface{}, error)
 
-type MutationFunc func(args map[interface{}]interface{}) interface{}
+type MutationFunc func(args map[interface{}]interface{}) (interface{}, error)
 
 type Server struct {
 	handlers map[transit.Keyword]QueryFunc
@@ -36,49 +35,66 @@ func (s Server) AddQueryFunc(k string, f QueryFunc) {
 	s.handlers[key] = f
 }
 
-func (s Server) InvokeQueryFunc(key transit.Keyword, params []interface{}, args map[interface{}]interface{}) interface{} {
+func (s Server) InvokeQueryFunc(key transit.Keyword, params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	var result interface{} = nil
+	var err error = nil
 	f, ok := s.handlers[key]
 	if ok {
-		result = f(params, args)
+		result, err = f(params, args)
 	}
-	return result
+	return result, err
 }
 
 func (s Server) AddMutationFunc(key transit.Symbol, f MutationFunc) {
 	s.mutators[key] = f
 }
 
-func (s Server) InvokeMutatorFunc(key transit.Symbol, args map[interface{}]interface{}) interface{} {
-	var result interface{} = nil
+func (s Server) InvokeMutatorFunc(key transit.Symbol, args map[interface{}]interface{}) (interface{}, error) {
+	var result interface{}
+	var err error
 	f, ok := s.mutators[key]
 	if ok {
-		result = f(args)
+		result, err = f(args)
 	}
-	return result
+	return result, err
 }
 
-func (s Server) rootQuery(query map[interface{}]interface{}, args map[interface{}]interface{}, result *transit.CMap) {
+func (s Server) rootQuery(query map[interface{}]interface{}, args map[interface{}]interface{}, result *transit.CMap) error {
+	var err error
 	for k, p := range query {
+		var val interface{}
 		key := k.(transit.Keyword)
 		params := p.([]interface{})
-		result.Append(key, s.InvokeQueryFunc(key, params, args))
+		val, err = s.InvokeQueryFunc(key, params, args)
+		if err != nil {
+			break
+		}
+		result.Append(key, val)
 	}
+	return err
 }
 
-func (s Server) mutation(op *list.List, result map[transit.Symbol]interface{}) {
+func (s Server) mutation(op *list.List, result map[transit.Symbol]interface{}) error {
+	var err error
 	key := op.Front().Value.(transit.Symbol)
 	args := op.Front().Next().Value.(map[interface{}]interface{})
-	// fmt.Println("mutation", key, args)
-	result[key] = s.InvokeMutatorFunc(key, args)
+	result[key], err = s.InvokeMutatorFunc(key, args)
+	return err
 }
 
-func (s Server) entityQuery(query *transit.CMap, args map[interface{}]interface{}, result *transit.CMap) {
+func (s Server) entityQuery(query *transit.CMap, args map[interface{}]interface{}, result *transit.CMap) error {
+	var err error
 	for _, e := range query.Entries {
+		var val interface{}
 		key := e.Key.([]interface{})[0].(transit.Keyword)
 		params := e.Value.([]interface{})
-		result.Append(e.Key, s.InvokeQueryFunc(key, params, args))
+		val, err = s.InvokeQueryFunc(key, params, args)
+		if err != nil {
+			break
+		}
+		result.Append(e.Key, val)
 	}
+	return err
 }
 
 func SPAFile(group *gin.Engine, relativePaths []string, filepath string) {
@@ -108,8 +124,6 @@ func SPAFile(group *gin.Engine, relativePaths []string, filepath string) {
 }
 
 func (s Server) SetupRouter() *gin.Engine {
-	var fileUpLoadId int64 = 0
-
 	gin.DisableConsoleColor()
 	r := gin.Default()
 
@@ -126,18 +140,19 @@ func (s Server) SetupRouter() *gin.Engine {
 		if err == nil {
 			req = obj.([]interface{})
 			if req != nil {
+				var err error = nil
 				for _, q := range req {
 					switch t := q.(type) {
 					case map[interface{}]interface{}:
 						if result == nil {
 							result = transit.NewCMap()
 						}
-						s.rootQuery(t, nil, result.(*transit.CMap))
+						err = s.rootQuery(t, nil, result.(*transit.CMap))
 					case *transit.CMap:
 						if result == nil {
 							result = transit.NewCMap()
 						}
-						s.entityQuery(t, nil, result.(*transit.CMap))
+						err = s.entityQuery(t, nil, result.(*transit.CMap))
 					case *list.List:
 						switch head := t.Front().Value.(type) {
 						case map[interface{}]interface{}:
@@ -145,24 +160,29 @@ func (s Server) SetupRouter() *gin.Engine {
 								result = transit.NewCMap()
 							}
 							args := t.Front().Next().Value.(map[interface{}]interface{})
-							s.rootQuery(head, args, result.(*transit.CMap))
+							err = s.rootQuery(head, args, result.(*transit.CMap))
 						case *transit.CMap:
 							if result == nil {
 								result = transit.NewCMap()
 							}
 							args := t.Front().Next().Value.(map[interface{}]interface{})
-							s.entityQuery(head, args, result.(*transit.CMap))
+							err = s.entityQuery(head, args, result.(*transit.CMap))
 						default:
 							if result == nil {
 								result = make(map[transit.Symbol]interface{})
 							}
-							s.mutation(t, result.(map[transit.Symbol]interface{}))
+							err = s.mutation(t, result.(map[transit.Symbol]interface{}))
 						}
 					default:
 						fmt.Printf("unknown query %v %T\n", t, t)
 					}
 				}
-				if result != nil {
+				if err != nil {
+					errResult := make(map[transit.Keyword]interface{})
+					errResult[transit.Keyword("message")] = err.Error()
+					result = errResult
+					c.Render(http.StatusBadGateway, Transit{Data: result})
+				} else if result != nil {
 					c.Render(http.StatusOK, Transit{Data: result})
 				} else {
 					c.AbortWithError(http.StatusBadRequest, err).SetType(gin.ErrorTypeRender)
@@ -173,37 +193,14 @@ func (s Server) SetupRouter() *gin.Engine {
 		}
 	})
 
-	r.POST("/file-upload", func(c *gin.Context) {
-		file, err := c.FormFile("file")
-		if err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("get form err: %s", err.Error()))
-			return
-		}
-
-		if err := c.SaveUploadedFile(file, "tmp-"+strconv.FormatInt(fileUpLoadId, 10)); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
-			return
-		}
-
-		decoder := transit.NewDecoder(strings.NewReader(c.PostForm("id")))
-		obj, err := decoder.Decode()
-		if err == nil {
-			req := obj.(transit.TaggedValue)
-			result := MkTempResult(req, fileUpLoadId)
-			c.Render(http.StatusOK, Transit{Data: result})
-		}
-
-		fileUpLoadId += 1
-	})
-
 	var paths = []string {
 		"/",
 		"/info/*id",
-		"/command",
+		"/command/*id",
 		"/reading",
 		"/profile",
 		"/schedule",
-		"/schedule-event",
+		"/schedule-event/*id",
 		"/schedule-event-info/*id",
 		"/profile-yaml",
 		"/addressable",
@@ -212,6 +209,7 @@ func (s Server) SetupRouter() *gin.Engine {
 		"/transmission",
 		"/export",
 		"/log",
+		"/login",
 	}
 
 	SPAFile(r, paths, "./assets/index.html")

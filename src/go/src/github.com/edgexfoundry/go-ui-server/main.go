@@ -19,6 +19,8 @@ func main() {
 	}
 
 	server := fulcro.NewServer()
+	server.AddQueryFunc("q/login", edgex.Login)
+	server.AddQueryFunc("q/change-pw", edgex.ChangePassword)
 	server.AddQueryFunc("q/edgex-devices", edgex.Devices)
 	server.AddQueryFunc("q/edgex-device-services", edgex.DeviceServices)
 	server.AddQueryFunc("q/edgex-schedule-events", edgex.ScheduleEvents)
