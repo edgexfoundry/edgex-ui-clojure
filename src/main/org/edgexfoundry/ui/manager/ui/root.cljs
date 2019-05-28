@@ -34,7 +34,14 @@
             [org.edgexfoundry.ui.manager.ui.login :as lg]
             [org.edgexfoundry.ui.manager.ui.load :as ld]))
 
+(defmutation setActiveMenu
+  "Fulcro mutation: Removes user identity from the local app and asks the server to forget the user as well."
+  [{:keys [entry] :as prop}]
+  (action [{:keys [component state]}]
+          (swap! state assoc :active-menu entry)))
+
 (defn show-devices [this]
+  (prim/transact! this `[(setActiveMenu {:entry :main})])
   (df/load this co/device-list-ident dv/DeviceList {:fallback `d/show-error})
   (df/load this co/profile-list-ident p/ProfileList {:fallback `d/show-error})
   (r/nav-to! this :main))
@@ -44,38 +51,47 @@
                          (m/toggle {:field :ui/menu-open?})]))
 
 (defn show-readings [this]
+  (prim/transact! this `[(setActiveMenu {:entry :reading})])
   (df/load this co/reading-page-ident rd/ReadingsPage {:fallback `d/show-error})
   (r/nav-to! this :reading))
 
 (defn show-schedules [this]
+  (prim/transact! this `[(setActiveMenu {:entry :schedule})])
   (df/load this co/schedules-list-ident sc/ScheduleList {:fallback `d/show-error})
   (r/nav-to! this :schedule))
 
 (defn show-profiles [this]
+  (prim/transact! this `[(setActiveMenu {:entry :profile})])
   (df/load this co/profile-list-ident p/ProfileList {:fallback `d/show-error})
   (r/nav-to! this :profile))
 
 (defn show-addressables [this]
+  (prim/transact! this `[(setActiveMenu {:entry :addressable})])
   (df/load this co/addressable-list-ident a/AddressableList {:fallback `d/show-error})
   (r/nav-to! this :addressable))
 
 (defn show-notifications [this]
+  (prim/transact! this `[(setActiveMenu {:entry :notification})])
   (prim/transact! this `[(nt/load-notifications {})])
   (r/nav-to! this :notification))
 
 (defn show-subscriptions [this]
+  (prim/transact! this `[(setActiveMenu {:entry :subscription})])
   (ld/load this co/subscriptions-list-ident sb/SubscriptionList)
   (r/nav-to! this :subscription))
 
 (defn show-transmissions [this]
+  (prim/transact! this `[(setActiveMenu {:entry :transmission})])
   (prim/transact! this `[(trn/load-transmissions {})])
   (r/nav-to! this :transmission))
 
 (defn show-exports [this]
+  (prim/transact! this `[(setActiveMenu {:entry :export})])
   (df/load this co/exports-list-ident ex/ExportList {:fallback `d/show-error})
   (r/nav-to! this :export))
 
 (defn show-logs [this]
+  (prim/transact! this `[(setActiveMenu {:entry :logs})])
   (prim/transact! this `[(logging/load-logs {})])
   (r/nav-to! this :logs))
 
@@ -137,57 +153,51 @@
                   (dom/i :$pe-7s-next-2)
                   " Log out "))])
 
-(defn sidebar [this route-handler sidebar? nav-open? collapse toggle]
+(defn sidebar [this route-handler sidebar? nav-open? collapse toggle activeMenu]
   (dom/div {:className "sidebar"}
-    (dom/div #js {:className "logo"}
-             (dom/a {:className "simple-text logo-mini"} " ")
-             (dom/a {:className "logo-normal"}
+    (dom/div {:className "logo"}
+             #_(dom/a {:className "simple-text logo-mini"} " ")
+             #_(dom/a {:className "logo-normal"}
                     (dom/img {:title "EdgeX" :src "img/logo.png" :style {:width "160px" :height "66px"}})))
-    (dom/div #js {:className "sidebar-wrapper"}
+    (dom/div {:className "sidebar-wrapper"}
              (when nav-open?
                (dom/ul {:className "nav"}
                        (relocatable-menu-items this)))
-             (dom/ul
-               #js {:className "nav"}
-               (menu-entry "Devices" "pe-7s-wallet" (or (= route-handler :main) (= route-handler :info)) #(show-devices this))
-               (menu-entry "Readings" "pe-7s-graph1" (= route-handler :reading) #(show-readings this))
+             (dom/ul {:className "nav"}
+               (menu-entry "Devices" "pe-7s-wallet" (or (= activeMenu :main) (= activeMenu :info)) #(show-devices this))
+               (menu-entry "Readings" "pe-7s-graph1" (= activeMenu :reading) #(show-readings this))
                ;(menu-entry "Notifications" "pe-7s-bell" (= route-handler :notification) #(show-notifications this))
-               (dom/li
-                 #js {}
-                 (dom/a #js {:onClick (fn [] (prim/transact! this `[(b/toggle-collapse {:id 1})
+               (dom/li {}
+                 (dom/a {:onClick (fn [] (prim/transact! this `[(b/toggle-collapse {:id 1})
                                                                     (m/toggle {:field :ui/collapse-1-toggle})]))
                              :data-toggle "collapse"
                              :aria-expanded toggle}
-                        (dom/i #js {:className "pe-7s-bell"})
-                        (dom/p #js {}
+                        (dom/i {:className "pe-7s-bell"})
+                        (dom/p {}
                                "Notifications"
-                               (dom/b #js {:className "caret"})))
+                               (dom/b {:className "caret"})))
                  (b/ui-collapse collapse
-                                (dom/ul
-                                  #js {:className "nav"}
-                                  (sub-menu-entry "Nt" "Notifications" sidebar? (= route-handler :notification) #(show-notifications this))
-                                  (sub-menu-entry "Sb" "Subscriptions" sidebar? (= route-handler :subscription) #(show-subscriptions this))
-                                  (sub-menu-entry "Tr" "Transmissions" sidebar? (= route-handler :transmission) #(show-transmissions this)))))
-               (menu-entry "Schedules" "pe-7s-clock" (or (= route-handler :schedule) (= route-handler :schedule-event)) #(show-schedules this))
-               (menu-entry "Export" "pe-7s-next-2" (= route-handler :export) #(show-exports this))
-               (menu-entry "Logs" "pe-7s-note2" (= route-handler :logs) #(show-logs this))
+                                (dom/ul {:className "nav"}
+                                  (sub-menu-entry "Nt" "Notifications" sidebar? (= activeMenu :notification) #(show-notifications this))
+                                  (sub-menu-entry "Sb" "Subscriptions" sidebar? (= activeMenu :subscription) #(show-subscriptions this))
+                                  (sub-menu-entry "Tr" "Transmissions" sidebar? (= activeMenu :transmission) #(show-transmissions this)))))
+               (menu-entry "Schedules" "pe-7s-clock" (or (= activeMenu :schedule) (= activeMenu :schedule-event)) #(show-schedules this))
+               (menu-entry "Export" "pe-7s-next-2" (= activeMenu :export) #(show-exports this))
+               (menu-entry "Logs" "pe-7s-note2" (= activeMenu :logs) #(show-logs this))
                ;(menu-entry "Rules Engine" "pe-7s-settings" false identity)
-               (dom/li
-                 #js {}
-                 (dom/a #js {:onClick (fn [] (prim/transact! this `[(b/toggle-collapse {:id 1})
+               (dom/li (dom/a {:onClick (fn [] (prim/transact! this `[(b/toggle-collapse {:id 1})
                                                                     (m/toggle {:field :ui/collapse-1-toggle})]))
                              :data-toggle "collapse"
                              :aria-expanded toggle}
                         (dom/i #js {:className "pe-7s-plugin"})
                         (dom/p #js {}
                                "Metadata"
-                               (dom/b #js {:className "caret"})))
+                               (dom/b {:className "caret"})))
                  (b/ui-collapse collapse
-                   (dom/ul
-                     #js {:className "nav"}
-                     (sub-menu-entry "Pr" "Profiles" sidebar? (= route-handler :profile) #(show-profiles this))
-                     (sub-menu-entry "Ad" "Addressables" sidebar? (= route-handler :addressable) #(show-addressables this)))))))
-    (dom/div #js {:className "sidebar-background" :style #js {:backgroundImage "url(img/side-bar.jpg)"}})))
+                   (dom/ul {:className "nav"}
+                     (sub-menu-entry "Pr" "Profiles" sidebar? (= activeMenu :profile) #(show-profiles this))
+                     (sub-menu-entry "Ad" "Addressables" sidebar? (= activeMenu :addressable) #(show-addressables this)))))))
+    #_(dom/div #js {:className "sidebar-background" :style #js {:backgroundImage "url(img/side-bar.jpg)"}})))
 
 (defn navbar [this sidebar? nav-open? menu-open?]
   (dom/nav
@@ -255,7 +265,7 @@
        "")))
 
 (defsc Main [this {:keys [device-data ui/collapse-1 ui/collapse-1-toggle ui/sidebar-open? ui/menu-open? ui/nav-open?
-                          ui/loading-data ui/route-handler page]:as props}]
+                          ui/loading-data ui/route-handler page active-menu]:as props}]
   {:initial-state (fn [p] {:ui/collapse-1 (prim/get-initial-state b/Collapse {:id 1 :start-open false})
                            :ui/collapse-1-toggle false
                            :ui/sidebar-open? true
@@ -267,7 +277,8 @@
    :query         [:page {:device-data (prim/get-query main/DeviceListOrInfoRouter)}
                    {:ui/collapse-1 (prim/get-query b/Collapse)}
                    :ui/collapse-1-toggle :ui/sidebar-open? :ui/menu-open? :ui/nav-open? :ui/route-handler [:ui/loading-data '_]
-                   [df/marker-table :readings-marker]]}
+                   [df/marker-table :readings-marker]
+                   [:active-menu '_]]}
   (let [attr (if sidebar-open?
                nil
                #js {:className "sidebar-mini"})
@@ -276,7 +287,7 @@
     (dom/div attr
              (dom/div #js {:className (cond-> "wrapper"
                                         nav-open? (str " nav-open"))}
-                      (sidebar this route-handler sidebar? nav-open? collapse-1 collapse-1-toggle)
+                      (sidebar this route-handler sidebar? nav-open? collapse-1 collapse-1-toggle active-menu)
                       (dom/div
                         #js {:className "main-panel"}
                         (navbar this sidebar? nav-open? menu-open?)

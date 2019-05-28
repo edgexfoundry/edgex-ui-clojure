@@ -12,24 +12,6 @@
     [fulcro.client.logging :as log]
     [org.edgexfoundry.ui.manager.ui.common :as co]))
 
-#_(def app-routing-tree
-  (r/routing-tree
-    (r/make-route :main [(r/router-instruction :device-router co/device-list-ident)])
-    (r/make-route :info [(r/router-instruction :device-router [:device :param/id])])
-    (r/make-route :control [(r/router-instruction :device-router co/command-list-ident)])
-    (r/make-route :reading [(r/router-instruction :device-router co/reading-page-ident)])
-    (r/make-route :profile [(r/router-instruction :device-router co/profile-list-ident)])
-    (r/make-route :schedule [(r/router-instruction :device-router co/schedules-list-ident)])
-    (r/make-route :schedule-event [(r/router-instruction :device-router co/schedule-events-list-ident)])
-    (r/make-route :schedule-event-info [(r/router-instruction :device-router [:schedule-event :param/id])])
-    (r/make-route :profile-yaml [(r/router-instruction :device-router co/profile-yaml-ident)])
-    (r/make-route :addressable [(r/router-instruction :device-router co/addressable-list-ident)])
-    (r/make-route :logs [(r/router-instruction :device-router co/log-entry-list-ident)])
-    (r/make-route :notification [(r/router-instruction :device-router co/notifications-list-ident)])
-    (r/make-route :subscription [(r/router-instruction :device-router co/subscriptions-list-ident)])
-    (r/make-route :transmission [(r/router-instruction :device-router co/transmissions-list-ident)])
-    (r/make-route :export [(r/router-instruction :device-router co/exports-list-ident)])))
-
 (def app-routing-tree
   (r/routing-tree
     (r/make-route :login [(r/router-instruction :top-router [:login :top])])

@@ -7,12 +7,13 @@
   :license {:name "Apache License Version 2.0" :url "https://www.apache.org/licenses/"}
   :min-lein-version "2.7.0"
 
-  :dependencies [[org.clojure/clojure "1.9.0"]
-                 [thheller/shadow-cljs "2.7.3"]
-                 [fulcrologic/fulcro "2.6.15"]
-                 [com.wsscode/pathom "2.2.0-RC3"]
+  :dependencies [[org.clojure/clojure "1.10.1-beta2"]
+                 [thheller/shadow-cljs "2.8.25"]
+                 [fulcrologic/fulcro "2.8.8"]
+                 [com.wsscode/pathom "2.2.12"]
                  [ring/ring-defaults "0.3.2"]
-                 [org.clojure/core.async "0.4.474"]
+                 [org.clojure/core.async "0.4.490"]
+                 [org.clojure/core.async "0.4.490"]
                  [garden "1.3.6"]
                  [mount "0.1.14"]
                  [hiccup "1.0.5"]
@@ -20,7 +21,7 @@
                  [http-kit "2.3.0"]
                  [ring/ring-core "1.7.1"]
                  [bk/ring-gzip "0.3.0"]
-                 [bidi "2.1.4"]
+                 [bidi "2.1.5"]
 
                  ;; the following 3 are not used directly, but are pinned to ensure consistency.
                  ;; delete then if you upgrade anything and reanalyze deps
@@ -29,7 +30,7 @@
                  [com.google.errorprone/error_prone_annotations "2.3.2"]
                  [com.google.code.findbugs/jsr305 "3.0.2"]
 
-                 [nubank/workspaces "1.0.0-preview9" :scope "test" :exclusions [com.cognitect/transit-java]]
+                 [nubank/workspaces "1.0.3" :scope "test" :exclusions [com.cognitect/transit-java]]
 
                  [com.andrewmcveigh/cljs-time "0.5.2"]
                  [clj-http "3.9.0"]
@@ -60,7 +61,7 @@
              :production {}
              :cljs       {:source-paths ["src/main" "src/test" "src/cards"]
                           :dependencies [[binaryage/devtools "0.9.10"]
-                                         [org.clojure/clojurescript "1.10.439"]
+                                         [org.clojure/clojurescript "1.10.520"]
                                          [fulcrologic/fulcro-inspect "2.2.4"]]}
              :dev        {:source-paths ["src/dev" "src/main" "src/test" "src/cards"]
                           :jvm-opts     ["-XX:-OmitStackTraceInFastThrow" "-Xmx1g"]
