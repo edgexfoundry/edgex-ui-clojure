@@ -17,6 +17,7 @@
             [org.edgexfoundry.ui.manager.api.mutations :as mu]
             [org.edgexfoundry.ui.manager.ui.routing :as routing]
             [org.edgexfoundry.ui.manager.ui.dialogs :as d]
+            [org.edgexfoundry.ui.manager.ui.devices :as dv]
             [goog.object :as gobj]
             ["highlight.js" :as hljs]))
 
@@ -104,12 +105,12 @@
 
 (def ui-add-profile-form (prim/factory AddProfileForm {:keyfn :db/id}))
 
-(defsc AddProfileModal [this {:keys [profile-form modal modal/page] :as props}]
-  {:initial-state (fn [p] {:profile-form (prim/get-initial-state AddProfileForm {:db/id 2})
+(defsc AddProfileModal [this {:keys [add-profile modal modal/page] :as props}]
+  {:initial-state (fn [p] {:add-profile (prim/get-initial-state dv/FileUpload {:upload-id 1})
                            :modal (prim/get-initial-state b/Modal {:id :add-profile-modal :backdrop true})
                            :modal/page :add-profile-modal})
    :ident (fn [] [:add-profile-modal :singleton])
-   :query [{:profile-form (prim/get-query AddProfileForm)}
+   :query [{:add-profile (prim/get-query dv/FileUpload)}
            {:modal (prim/get-query b/Modal)}
            {[:fulcro.ui.file-upload/by-id :pr-name] [:file-upload/files]}
            :modal/page]}
@@ -122,14 +123,11 @@
                                   (dom/div #js {:key "title"
                                                 :style #js {:fontSize "22px"}} "Upload Device Profile"))
                 (b/ui-modal-body nil
-                                 (ui-add-profile-form profile-form))
+                                 (dv/ui-file-upload add-profile))
                 (b/ui-modal-footer nil
-                                   (b/button {:key "upload-button" :className "btn-fill" :kind :info
-                                              :onClick #(upload-profile this upload-file-id)}
-                                             "Upload")
-                                   (b/button {:key "cancel-button" :className "btn-fill" :kind :danger
+                                   (b/button {:key "done-button" :className "btn-fill" :kind :danger
                                               :onClick #(prim/transact! this `[(b/hide-modal {:id :add-profile-modal})])}
-                                             "Cancel")))))
+                                             "Done")))))
 
 (defsc ProfileYAMLFile [this {:keys [yaml]}]
   {:ident (fn [] [:yaml-file :singleton])

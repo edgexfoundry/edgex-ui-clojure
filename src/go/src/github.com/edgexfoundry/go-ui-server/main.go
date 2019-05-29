@@ -56,6 +56,7 @@ func main() {
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/delete-schedule-event", edgex.DeleteScheduleEvent)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/issue-set-command", edgex.IssueSetCommand)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/add-notification", edgex.AddNotification)
+	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/delete-notification", edgex.DeleteNotification)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/add-subscription", edgex.AddSubscription)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/edit-subscription", edgex.EditSubscription)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/delete-subscription", edgex.DeleteSubscription)
@@ -63,6 +64,7 @@ func main() {
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/edit-export", edgex.EditExport)
 	server.AddMutationFunc("org.edgexfoundry.ui.manager.api.mutations/delete-export", edgex.DeleteExport)
 	router := server.SetupRouter()
+	edgex.AddUpload(router)
 
 	// Listen on all interfaces at specified port
 	router.Run(":" + strconv.Itoa(config.Server.Port))

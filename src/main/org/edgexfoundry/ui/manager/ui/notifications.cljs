@@ -16,9 +16,10 @@
             [org.edgexfoundry.ui.manager.api.mutations :as mu]
             [org.edgexfoundry.ui.manager.ui.common :as co]
             [org.edgexfoundry.ui.manager.ui.date-time-picker :as dtp]
+            [org.edgexfoundry.ui.manager.ui.dialogs :as d]
             [org.edgexfoundry.ui.manager.ui.load :as ld]
             [org.edgexfoundry.ui.manager.ui.routing :as ro]
-            [org.edgexfoundry.ui.manager.ui.table :refer [deftable]]
+            [org.edgexfoundry.ui.manager.ui.table :as t :refer [deftable]]
             [org.edgexfoundry.ui.manager.ui.transmissions :as trn]
             ["react-tag-box" :refer [TagBox]]
             ["react-widgets" :refer [SelectList]]))
@@ -74,6 +75,12 @@
         (prim/transact! comp `[(b/hide-modal {:id :notification-modal})
                                (mu/add-notification ~notifyObj)
                                (df/fallback {:action ld/reset-error})])))
+
+(defn do-delete-notification [this id {:keys [content]}]
+  (let [slug (-> (filter #(= id (:id %)) content) first :slug)]
+    (prim/transact! this `[(mu/delete-notification {:id ~id :slug ~slug})
+                           (t/reset-table-page {:id :show-notifications})
+                           (df/fallback {:action ld/reset-error})])))
 
 (def ui-tag-box (co/factory-apply TagBox))
 
@@ -171,7 +178,9 @@
                                                               [:labels "Labels" #(co/conv-seq %2)]]
   [{:onClick #(show-notification-modal this) :icon "plus"}
    {:onClick #(show-notifications this) :icon "refresh"}]
-    :actions [{:title "View Transmission" :action-class :info :symbol "file" :onClick show-transmissions}]
+    :modals [{:modal d/DeleteModal :params {:modal-id :dnt-modal} :callbacks {:onDelete do-delete-notification}}]
+    :actions [{:title "View Transmission" :action-class :info :symbol "file" :onClick show-transmissions}
+              {:title "Delete Transmission" :action-class :danger :symbol "times" :onClick (d/mk-show-modal :dnt-modal props)}]
     :search-keyword :content :search {:comp NotificationSearch})
 
 (defmutation load-notifications [none]

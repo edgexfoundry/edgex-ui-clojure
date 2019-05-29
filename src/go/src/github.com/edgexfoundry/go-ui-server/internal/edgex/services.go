@@ -8,10 +8,12 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-  "math"
+	"github.com/gin-gonic/gin"
+	"math"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"strconv"
 	"strings"
@@ -74,6 +76,34 @@ func ChangePassword(params []interface{}, args map[interface{}]interface{}) (int
 		return  nil, err
 	}
 	return nil, nil
+}
+
+func AddUpload(r *gin.Engine) {
+	var fileUpLoadId int64 = 0
+
+	r.POST("/file-uploads", func(c *gin.Context) {
+		file, err := c.FormFile("file")
+		if err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("get form err: %s", err.Error()))
+			return
+		}
+
+		if err := c.SaveUploadedFile(file, "tmp-"+strconv.FormatInt(fileUpLoadId, 10)); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
+			return
+		}
+
+		decoder := transit.NewDecoder(strings.NewReader(c.PostForm("id")))
+		obj, err := decoder.Decode()
+		if err == nil {
+			req := obj.(transit.TaggedValue)
+			result := make(map[transit.Symbol]interface{})
+			result[transit.Symbol("upload")] = fulcro.MkTempResult(req, fileUpLoadId)
+			c.Render(http.StatusOK, fulcro.Transit{Data: result})
+		}
+
+		fileUpLoadId += 1
+	})
 }
 
 func getDevices() (interface{}, error) {
@@ -1013,8 +1043,8 @@ func AddNotification(args map[interface{}]interface{}) (interface{}, error) {
 		Slug: fulcro.GetString(args, "slug"),
 		Description: fulcro.GetString(args, "description"),
 		Sender: fulcro.GetString(args, "sender"),
-		Category: fulcro.GetString(args, "category"),
-		Severity: fulcro.GetString(args, "severity"),
+		Category: fulcro.GetKeywordAsString(args, "category"),
+		Severity: fulcro.GetKeywordAsString(args, "severity"),
 		Content: fulcro.GetString(args,"content"),
 		Labels: fulcro.GetStringSeq(args, "labels"),
 	}
@@ -1023,6 +1053,12 @@ func AddNotification(args map[interface{}]interface{}) (interface{}, error) {
 		result = fulcro.MkTempIdResult(tempid, resp)
 	}
 	return result, err
+}
+
+func DeleteNotification(args map[interface{}]interface{}) (interface{}, error) {
+	slug := fulcro.GetString(args, "slug")
+	_, err := resty.R().Delete(getEndpoint(ClientNotifications) + "notification/slug/" + slug)
+	return slug, err
 }
 
 type Channel struct {

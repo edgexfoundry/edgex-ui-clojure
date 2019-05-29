@@ -405,6 +405,7 @@
   (let [delete-cbs {:da-modal a/do-delete-addressable
                     :dd-modal dv/do-delete-device
                     :de-modal ex/do-delete-export
+                    :dnt-modal nt/do-delete-notification
                     :dsb-modal sb/do-delete-subscription
                     :dp-modal p/do-delete-profile
                     :ds-modal sc/do-delete-schedule
