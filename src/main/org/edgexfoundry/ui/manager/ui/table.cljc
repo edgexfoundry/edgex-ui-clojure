@@ -139,7 +139,7 @@
        :title     ~title,
        :className ~classes
        :onClick   #((get (fulcro.client.primitives/get-computed ~'this) ~title)
-                    ~'this (get ~'props :type) (get ~'props :id))}
+                    ~'this (get ~'props :type) (get ~'props :id) (get ~'props :slug))}
        (fulcro.client.dom/i {:className ~image-classes}))))
 
 (defn str-conv [p v]

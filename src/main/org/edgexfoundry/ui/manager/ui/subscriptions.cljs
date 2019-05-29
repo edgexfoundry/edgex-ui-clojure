@@ -103,11 +103,10 @@
                              (mu/edit-subscription ~subObj)
                              (df/fallback {:action ld/reset-error})]))))
 
-(defn do-delete-subscription [this id {:keys [content]}]
-  (let [slug (-> (filter #(= id (:id %)) content) first :slug)]
+(defn do-delete-subscription [this id slug]
     (prim/transact! this `[(mu/delete-subscription {:id ~id :slug ~slug})
                            (t/reset-table-page {:id :show-subscriptions})
-                           (df/fallback {:action ld/reset-error})])))
+                           (df/fallback {:action ld/reset-error})]))
 
 (declare conv-category)
 (declare conv-sev)

@@ -76,11 +76,10 @@
                                (mu/add-notification ~notifyObj)
                                (df/fallback {:action ld/reset-error})])))
 
-(defn do-delete-notification [this id {:keys [content]}]
-  (let [slug (-> (filter #(= id (:id %)) content) first :slug)]
-    (prim/transact! this `[(mu/delete-notification {:id ~id :slug ~slug})
-                           (t/reset-table-page {:id :show-notifications})
-                           (df/fallback {:action ld/reset-error})])))
+(defn do-delete-notification [this id slug]
+  (prim/transact! this `[(mu/delete-notification {:id ~id :slug ~slug})
+                         (t/reset-table-page {:id :show-notifications})
+                         (df/fallback {:action ld/reset-error})]))
 
 (def ui-tag-box (co/factory-apply TagBox))
 
@@ -149,7 +148,7 @@
                                                       (fs/reset-form!)
                                                       (fs/clear-complete!)])} "Cancel")))))
 
-(defn show-transmissions [this type slug]
+(defn show-transmissions [this type id slug]
   (prim/transact! this `[(trn/load-transmissions {:slug ~slug})])
   (ro/nav-to! this :transmission))
 
