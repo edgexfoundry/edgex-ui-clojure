@@ -192,6 +192,15 @@
                                      (update-in [:show-notifications :singleton :content] add-ref))))))
   (remote [env] true))
 
+(defmutation delete-notification
+  [{:keys [id slug]}]
+  (action [{:keys [state]}]
+          (letfn [(filter-notification [list] (filterv #(not= (second %) id) list))]
+            (swap! state (fn [s] (-> s
+                                     (update :subscription dissoc id)
+                                     (update-in (conj co/notifications-list-ident :content) filter-notification))))))
+  (remote [env] true))
+
 (defmutation add-subscription
   [{:keys [tempid] :as sub}]
   (action [{:keys [state]}]

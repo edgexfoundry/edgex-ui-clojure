@@ -178,6 +178,13 @@
                                       :body
                                       keyword)}})))
 
+(defmutation delete-notification
+  [{:keys [slug]}]
+  (action [{:keys [state]}]
+          (->> slug
+               (str "notification/slug/")
+               (e/edgex-delete :notification))))
+
 (defmutation add-subscription
   [{:keys [tempid slug] :as sub}]
   (action [{:keys [state]}]

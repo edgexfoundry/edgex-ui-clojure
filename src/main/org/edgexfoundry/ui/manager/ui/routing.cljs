@@ -56,7 +56,7 @@
 
 (def app-routes
   [[:get "/login" :login]
-  [[:get "/" :main]
+   [:get "/" :main]
    [:get "/info/:id{[0-9a-f-]+}" :info]
    [:get "/command" :control]
    [:get "/reading" :reading]
