@@ -142,6 +142,27 @@ use the *Builds* menu to enable/disable whichever builds you want watched/runnin
 
 Shadow-cljs will also start a web server for any builds that configure one.
 
+### Start the Go Web server
+
+```
+$ cd src/go
+$ export GOPATH=$PWD
+$ cd src/github.com/edgexfoundry/go-ui-server/
+```
+#### Install the Go packages
+```
+$ go get
+```
+#### Make soft link and start the web server
+```
+$ ln -s ../../../../../../resources/public/ assets; ln -s ../../../../res/
+$ go run main.go
+```
+#### Log in
+Navigate to http://localhost:3001 to login.
+The default password is `admin`.
+User can change the password by clicking the `Change password` link.
+
 ### Client REPL
 
 The shadow-cljs compiler starts an nREPL. It is configured to start on
@@ -197,4 +218,3 @@ Fulcro inspect will preload on the development build of the main
 application and workspaces.  You must install the plugin in Chrome from the
 Chrome store (free) to access it.  It will add a Fulcro Inspect tab to the
 developer tools pane.
-
