@@ -3,7 +3,9 @@
 ;;; SPDX-License-Identifier: Apache-2.0
 
 (ns org.edgexfoundry.ui.manager.ui.login
-  (:require [fulcro.client.data-fetch :as df]
+  (:require [clojure.spec.alpha :as s]
+            [clojure.string :as str]
+            [fulcro.client.data-fetch :as df]
             [fulcro.client.localized-dom :as dom]
             [fulcro.client.mutations :as m :refer [defmutation]]
             [fulcro.client.primitives :as prim :refer [defui defsc]]
@@ -67,7 +69,7 @@
     (dom/div :$login-wrap
              (dom/div :$login-html
                       (dom/div :$login-form
-                               (dom/div :$welcome "Welcome to EdgeX Manager!")
+                               (dom/div :$welcome "Welcome to EdgeX Manager")
                                (dom/div :$subtitle "Please enter your password to login")
                                (dom/div :$login-pw
                                         (b/labeled-input {:id "password" :value password :type "password" :split 3 :placeholder "Password"
@@ -113,32 +115,51 @@
 
 (def ui-logout-modal (prim/factory LogoutModal))
 
+(defn new-user-form-valid [form field]
+  (let [v (get form field)]
+    (case field
+      :ui/oldpassword (and (string? v) (seq (str/trim v))) ; not empty
+      :ui/newpassword-2 (= v (:ui/newpassword form)))))          ; passwords match
+
+(def validator (fs/make-validator new-user-form-valid))
+
+(s/def :ui/oldpassword #(re-matches #"\S+" %))
+(s/def :ui/newpassword #(re-matches #"\S+" %))
+(s/def :ui/newpassword-2 #(re-matches #"\S+" %))
+
 (defsc ChangePWModal [this {:keys [ui/oldpassword ui/newpassword modal] :as props}]
-  {:initial-state (fn [p] {:ui/oldpassword "" :ui/newpassword ""
+  {:initial-state (fn [p] {:ui/oldpassword "" :ui/newpassword "" :ui/newpassword-2 ""
                            :modal (prim/get-initial-state b/Modal {:id :change-pw-modal :backdrop true})
                            :modal/page :change-pw})
    :ident (fn [] co/change-pw-ident)
-   :query [:ui/oldpassword :ui/newpassword fs/form-config-join :id
+   :query [:ui/oldpassword :ui/newpassword :ui/newpassword-2 fs/form-config-join :id
            {:modal (prim/get-query b/Modal)} :modal/page]
-   :form-fields #{:ui/oldpassword :ui/newpassword}}
+   :form-fields #{:ui/oldpassword :ui/newpassword :ui/newpassword-2}}
   (let [cancel (fn [evt] (prim/transact! this `[(b/hide-modal {:id :change-pw-modal})
                                                 (fs/reset-form!)
                                                 (fs/clear-complete!)]))
         save (fn [evt] (prim/transact! this `[(change-password {:oldpassword ~oldpassword :newpassword ~newpassword})
                                               (b/hide-modal {:id :change-pw-modal})
                                               (fs/reset-form!)
-                                              (df/fallback {:action ld/reset-error})]))]
+                                              (fs/clear-complete!)
+                                              (df/fallback {:action ld/reset-error})]))
+        validity (validator props :ui/newpassword-2)
+        is-invalid? (= :invalid validity)
+        disable-button (or (not (fs/checked? props))(fs/invalid-spec? props) is-invalid?)]
     (b/ui-modal modal
                 (b/ui-modal-title nil
                                   (dom/div {:key "title" :style {:fontSize "22px"}} (tr "Change Password")))
       (b/ui-modal-body nil
                        (dom/div :$card
                                 (dom/div :$content
-                                         (dom/div :$form-group
-                                                  (co/input-with-label this :ui/oldpassword "Current Password:" "" "" nil {:type "password"})
-                                                  (co/input-with-label this :ui/newpassword "New Password:" "" "" nil {:type "password"})))))
+                                         (dom/div :$form-group$change-pw
+                                                  (co/input-with-label this :ui/oldpassword "Current password:" "Current password is required" "" nil {:type "password"})
+                                                  (co/input-with-label this :ui/newpassword "New password:" "New password is required" "" nil {:type "password"})
+                                                  (co/input-with-label this :ui/newpassword-2 "Re-enter new password:" "Confirm password is required" "" nil {:type "password"})
+                                                  (when (and (not (fs/invalid-spec? props :ui/newpassword-2)) is-invalid?)
+                                                    (dom/span :$warning "New password doesn't match the confirm password."))))))
       (b/ui-modal-footer nil
-                         (b/button {:key "save-button" :className "btn-fill" :kind :info :onClick save} "Save")
+                         (b/button {:key "save-button" :className "btn-fill" :kind :info :disabled disable-button :onClick save} "Save")
                          (b/button {:key "cancel-button" :className "btn-fill" :kind :danger :onClick cancel} "Cancel")))))
 
 (def ui-change-pw-modal (prim/factory ChangePWModal))
