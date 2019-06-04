@@ -74,6 +74,8 @@
                    :labels labels}]
         (prim/transact! comp `[(b/hide-modal {:id :notification-modal})
                                (mu/add-notification ~notifyObj)
+                               (fs/reset-form!)
+                               (fs/clear-complete!)
                                (df/fallback {:action ld/reset-error})])))
 
 (defn do-delete-notification [this id slug]
@@ -87,7 +89,7 @@
 
 (s/def :notify/slug #(re-matches #"\S+" %))
 
-(defsc NotificationModal [this {:keys [id modal labels selectedItems] :as props}]
+(defsc NotificationModal [this {:keys [id modal labels selectedItems category severity content] :as props}]
   {:initial-state (fn [p] {:modal         (prim/get-initial-state b/Modal {:id :notification-modal :backdrop true})
                            :modal/page    :new-notification
                            :notify/slug "" :description "" :sender "" :category :SECURITY :severity :CRITICAL :content ""
@@ -122,15 +124,15 @@
                               (co/input-with-label this :sender "Sender:" "" "Sender of the notification" nil nil)
                               (co/input-with-label this :category "Category:" "" "" nil nil
                                                    (fn [attrs]
-                                                     (ui-select-list  {:data ctg_opts :textField :name
+                                                     (ui-select-list  {:data (clj->js ctg_opts) :textField :name :valueField :id :value (clj->js {:id category})
                                                                        :onChange (set-opt! :category)})))
                               (co/input-with-label this :severity "Severity:" "" "" nil nil
                                                    (fn [attrs]
-                                                     (ui-select-list  {:data sev_opts :textField :name
+                                                     (ui-select-list  {:data (clj->js sev_opts) :textField :name :valueField :id :value (clj->js {:id severity})
                                                                        :onChange (set-opt! :severity)})))
                               (co/input-with-label this :content "Content:" "" "" nil nil
                                                    (fn [attrs]
-                                                     (let [attrs (merge attrs {:onChange (fn [event] (m/set-value! this :content (.. event -target -value)))})]
+                                                     (let [attrs (merge attrs {:onChange (fn [event] (m/set-value! this :content (.. event -target -value))) :value content})]
                                                        (dom/textarea (clj->js attrs)))))
                               (co/input-with-label this :labels "Labels:" "" "" nil nil
                                                    (fn [attrs]

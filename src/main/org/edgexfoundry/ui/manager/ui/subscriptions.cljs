@@ -98,6 +98,8 @@
     (if (nil? id)
       (prim/transact! comp `[(b/hide-modal {:id :subscription-modal})
                              (mu/add-subscription ~subObj)
+                             (fs/reset-form!)
+                             (fs/clear-complete!)
                              (df/fallback {:action ld/reset-error})])
       (prim/transact! comp `[(b/hide-modal {:id :subscription-modal})
                              (mu/edit-subscription ~subObj)

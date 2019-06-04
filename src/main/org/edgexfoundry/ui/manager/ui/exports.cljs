@@ -157,6 +157,7 @@
                              (df/fallback {:action ld/reset-error})])
       (prim/transact! comp `[(b/hide-modal {:id :add-export-modal})
                              (mu/edit-export ~exportObj)
+                             (fs/reset-form!)
                              (df/fallback {:action ld/reset-error})]))))
 
 (defn edit-export [comp {:keys [id name protocol address port path method publisher topic user password cert key
