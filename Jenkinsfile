@@ -29,6 +29,11 @@ pipeline {
             steps {
                 edgeXSetupEnvironment()
                 edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
+                edgeXSemver 'init'
+                script {
+                    def semverVersion = edgeXSemver()
+                    env.setProperty('VERSION', semverVersion)
+                    sh 'echo $VERSION > VERSION'}
             }
         }
 
@@ -58,6 +63,16 @@ pipeline {
             }
         }
 
+        stage('SemVer Tag') {
+            when { expression { edgex.isReleaseStream() } }
+            steps {
+                sh 'echo v${VERSION}'
+                edgeXSemver('tag')
+                edgeXInfraLFToolsSign(command: 'git-tag', version: 'v${VERSION}')
+                edgeXSemver('push')
+            }
+        }
+
         stage('Docker Push') {
             when { expression { edgex.isReleaseStream() } }
             steps {
@@ -66,15 +81,24 @@ pipeline {
                         //amd64
                         image_amd64.push("amd64")
                         image_amd64.push(env.GIT_COMMIT)
-                        image_amd64.push(env.BUILD_NUMBER)
+                        image_amd64.push(env.VERSION)
                         //arm64
                         image_arm64.push("arm64")
                         image_arm64.push("${env.GIT_COMMIT}-arm64")
-                        image_arm64.push("${env.BUILD_NUMBER}-arm64")
+                        image_arm64.push("${env.VERSION}-arm64")
                     }
                 }
             }
         }
+        
+        stage('SemVer Bump') {
+            when { expression { edgex.isReleaseStream() } }
+            steps {
+                edgeXSemver('bump patch')
+                edgeXSemver('push')
+            }
+        }
+
     }
 
     post {
