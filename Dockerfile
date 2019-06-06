@@ -1,29 +1,30 @@
-FROM alpine:3.8 as gobuider
+FROM golang:1.10-alpine as gobuider
 
-WORKDIR /root/go
+RUN apk add --no-cache git build-base
 
-RUN apk add --no-cache go git build-base
+COPY src/go .
 
-COPY src/go . 
+RUN go get -d -v ./...
 
-RUN go get -d -v github.com/russolsen/transit
-RUN go get -d -v github.com/gin-gonic/gin
-RUN go get -d -v gopkg.in/resty.v1
-RUN go get -d -v github.com/BurntSushi/toml
 RUN CGO_ENABLED=0 go install -v -ldflags '-extldflags "-static"' github.com/edgexfoundry/go-ui-server
 
-FROM clojure:lein-2.7.1-alpine as clojurebuilder
+FROM clojure:lein as clojurebuilder
 COPY . /usr/src/app
 WORKDIR /usr/src/app
-RUN apk add --no-cache nodejs-npm
+RUN (curl -sL https://deb.nodesource.com/setup_10.x | bash -) && apt-get -y install nodejs
 RUN npm install && npm install react
 RUN lein with-profile cljs run -m shadow.cljs.devtools.cli release main
 
 FROM scratch
 WORKDIR /root/
-COPY --from=gobuider /root/go/bin/go-ui-server .
+COPY --from=gobuider /go/bin/go-ui-server .
 COPY --from=clojurebuilder /usr/src/app/resources/public assets
 COPY --from=clojurebuilder /usr/src/app/resources/configuration.toml res/configuration.toml
 ENV PORT=8080
+ENV DATA_FILE=/edgex-manager/data/password
 EXPOSE $PORT
+
+# Declare volumes to mount
+VOLUME ["/edgex-manager/data"]
+
 ENTRYPOINT ["/root/go-ui-server"]

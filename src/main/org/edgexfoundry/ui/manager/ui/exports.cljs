@@ -38,9 +38,9 @@
                                      deviceNames (mapv #(get-in s [:device % :name]) deviceIDs)
                                      profileIDs (mapv #(last %) (get-in s [:show-profiles :singleton :content]))
                                      readings (reduce (fn [col id]
-                                                        (let [resources (get-in s [:device-profile id :resources])
+                                                        (let [resources (get-in s [:device-profile id :deviceCommands])
                                                               profileName (get-in s [:device-profile id :name])]
-                                                          (mapv #(hash-map :id (:name %), :name (:name %), :profile profileName) resources))) [] profileIDs)]
+                                                          (mapv #(hash-map :id (-> (:get %)(first)(:object)), :name (-> (:get %)(first)(:object)), :profile profileName) resources))) [] profileIDs)]
                                  (-> s
                                      (assoc-in  [::export-devices :singleton] deviceNames)
                                      (assoc-in  [::export-readings :singleton] readings)))))))
@@ -154,9 +154,11 @@
     (if (nil? id)
       (prim/transact! comp `[(b/hide-modal {:id :add-export-modal})
                              (mu/add-export ~exportObj)
+                             (fs/reset-form!)
                              (df/fallback {:action ld/reset-error})])
       (prim/transact! comp `[(b/hide-modal {:id :add-export-modal})
                              (mu/edit-export ~exportObj)
+                             (fs/reset-form!)
                              (df/fallback {:action ld/reset-error})]))))
 
 (defn edit-export [comp {:keys [id name protocol address port path method publisher topic user password cert key
@@ -199,11 +201,10 @@
                                                                              :IOTCORE_TOPIC :IOTCORE_JSON
                                                                              :AZURE_TOPIC :AZURE_JSON
                                                                              :AWS_TOPIC :AWS_JSON
-                                                                             :INFLUXDB_ENDPOINT :NOOP
                                                                              :JSON))
           (swap! state assoc-in [::export-address-subform :singleton :protocol] (cond
                                                                                   (#{:IOTCORE_TOPIC :AZURE_TOPIC} value) "tls"
-                                                                                  (#{:AWS_TOPIC :INFLUXDB_ENDPOINT} value) ""
+                                                                                  (#{:AWS_TOPIC} value) ""
                                                                                   :else "tcp"))
           (swap! state assoc-in [::export-address-subform :singleton :exp/port] (cond
                                                                                   (#{:IOTCORE_TOPIC :AZURE_TOPIC :AWS_TOPIC} value) 8883
@@ -262,8 +263,7 @@
                             (b/dropdown-item :AWS_TOPIC "MQTT (AWS)")
                             (b/dropdown-item :AZURE_TOPIC "MQTT (Azure)")
                             (b/dropdown-item :MQTT_TOPIC "MQTT Topic")
-                            (b/dropdown-item :XMPP_TOPIC "XMPP")
-                            (b/dropdown-item :INFLUXDB_ENDPOINT "InfluxDB")])
+                            (b/dropdown-item :XMPP_TOPIC "XMPP")])
 
 (def protocol-dropdowns [(b/dropdown-item "http" "HTTP")
                          (b/dropdown-item "https" "HTTPS")
@@ -337,13 +337,13 @@
 (def ui-exp-type-entry (prim/factory ExpTypeEntry))
 
 ; exp/address:  Hostname and IP Regex
-(s/def :exp/address #(re-matches #"(^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$)|(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$)" %))
+(s/def :exp/address #(re-matches #"(^(([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*:?[a-zA-Z0-9\-]*@?[a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9])$)|(^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$)" %))
 (s/def :exp/port (s/int-in 1 65535))
 (s/def :exp/publisher #(re-matches #"\S+" %))
 (s/def :exp/topic #(re-matches #"\S+" %))
 
 (defsc ExpAddressEntry [this {:keys [protocol exp/address exp/port method ui/prt-dropdown ui/method-dropdown] :as props}]
-  {:initial-state (fn [p] {:protocol "tcp" :exp/address "" :exp/port 1 :path "" :method :post :exp/publisher "" :exp/topic "" :cert "" :key ""
+  {:initial-state (fn [p] {:protocol "tcp" :exp/address "" :exp/port 1 :path "" :method :post :exp/publisher "" :exp/topic "" :user "" :password "" :cert "" :key ""
                            :ui/prt-dropdown    (b/dropdown :prt-dropdown "Protocol Type" protocol-dropdowns)
                            :ui/method-dropdown (b/dropdown :method-dropdown "Protocol Type" method-dropdowns)})
    :query         [:protocol :exp/address :exp/port :path :method :exp/publisher :exp/topic :user :password :cert :key fs/form-config-join
@@ -383,37 +383,37 @@
         hideUser? (isHidden dest :user)
         hidePW? (isHidden dest :password)
         hideCertKey? (isHidden dest :cert)]
-    (dom/div :.form-group
-             (dom/div (when hidePrtl? :$hidden)
-                      (co/input-with-label this :protocol "Protocol:" "" "" nil nil
-                                           (fn [attrs]
-                                             (b/ui-dropdown prt-dropdown :value protocol
-                                                            :onSelect (fn [v] (m/set-value! this :protocol v))))))
-             (co/input-with-label this :exp/address "Address:" (if (str/blank? address) "Address is a required field." "Invalid Address.") addressPH nil nil)
-             (dom/div (when hidePort? :$hidden)
-                      (co/input-with-label this :exp/port  "Port:" (if (str/blank? port) "Port is a required field." "Invalid port number.") "Port of the Export Client" nil (if (= dest :AZURE_TOPIC) {:disabled true} nil)))
-             (dom/div (when hidePath? :$hidden)
-                      (co/input-with-label this :path "Path:" "" "URL Path of the Export Client" nil nil))
-             (dom/div (when hideMethod? :$hidden)
-                      (co/input-with-label this :method "Method:" "" "" nil nil
-                                           (fn [attrs]
-                                             (b/ui-dropdown method-dropdown :value method
-                                                            :onSelect (fn [v] (m/set-value! this :method v))))))
-             (when-not hidePub? (co/input-with-label this :exp/publisher "Publisher:" (if (= dest :MQTT_TOPIC) "" "Publisher is a required field.") publisherPH nil nil))
-             (when-not hideTopic? (co/input-with-label this :exp/topic "Topic:" "Topic is a required field." topicPH nil nil))
-             (dom/div (when hideUser? :$hidden)
-                      (co/input-with-label this :user "User:" "" userPH nil nil))
-             (dom/div (when hidePW? :$hidden)
-                      (if (#{:AZURE_TOPIC :IOTCORE_TOPIC} dest)
-                        (co/input-with-label this :password "Password:" "" pwPH nil nil
-                                             (fn [attrs]
-                                               (let [attrs (merge attrs {:onChange (fn [event] (m/set-value! this :password (.. event -target -value)))})]
-                                                 (dom/textarea (clj->js attrs)))))
-                        (co/input-with-label this :password "Password:" "" pwPH nil {:type "password"})))
-             (dom/div (when hideCertKey? :$hidden)
-                      (co/input-with-label this :cert "Certificate Path:" "" "Path of the certificate file" nil nil))
-             (dom/div (when hideCertKey? :$hidden)
-                      (co/input-with-label this :key "Private key path:" "" "Path of the private key file" nil nil)))))
+        (dom/div :.form-group
+           (dom/div (when hidePrtl? :$hidden)
+             (co/input-with-label this :protocol "Protocol:" "" "" nil nil
+                                  (fn [attrs]
+                                    (b/ui-dropdown prt-dropdown :value protocol
+                                                   :onSelect (fn [v] (m/set-value! this :protocol v))))))
+           (co/input-with-label this :exp/address "Address:" (if (str/blank? address) "Address is a required field." "Invalid Address.") addressPH nil nil)
+           (dom/div (when hidePort? :$hidden)
+             (co/input-with-label this :exp/port  "Port:" (if (str/blank? port) "Port is a required field." "Invalid port number.") "Port of the Export Client" nil (if (= dest :AZURE_TOPIC) {:disabled true} nil)))
+           (dom/div (when hidePath? :$hidden)
+             (co/input-with-label this :path "Path:" "" "URL Path of the Export Client" nil nil))
+           (dom/div (when hideMethod? :$hidden)
+             (co/input-with-label this :method "Method:" "" "" nil nil
+                                  (fn [attrs]
+                                    (b/ui-dropdown method-dropdown :value method
+                                                   :onSelect (fn [v] (m/set-value! this :method v))))))
+           (when-not hidePub? (co/input-with-label this :exp/publisher "Publisher:" (if (= dest :MQTT_TOPIC) "" "Publisher is a required field.") publisherPH nil nil))
+           (when-not hideTopic? (co/input-with-label this :exp/topic "Topic:" "Topic is a required field." topicPH nil nil))
+           (dom/div (when hideUser? :$hidden)
+             (co/input-with-label this :user "User:" "" userPH nil nil))
+           (dom/div (when hidePW? :$hidden)
+             (if (#{:AZURE_TOPIC :IOTCORE_TOPIC} dest)
+               (co/input-with-label this :password "Password:" "" pwPH nil nil
+                                    (fn [attrs]
+                                      (let [attrs (merge attrs {:onChange (fn [event] (m/set-value! this :password (.. event -target -value)))})]
+                                        (dom/textarea (clj->js attrs)))))
+               (co/input-with-label this :password "Password:" "" pwPH nil {:type "password"})))
+           (dom/div (when hideCertKey? :$hidden)
+             (co/input-with-label this :cert "Certificate path:" "" "Path of the certificate file" nil nil))
+           (dom/div (when hideCertKey? :$hidden)
+             (co/input-with-label this :key "Private key path:" "" "Path of the private key file" nil nil)))))
 
 (def ui-exp-address-entry (prim/factory ExpAddressEntry))
 
@@ -447,14 +447,14 @@
 (defn isHidden
   [dest field]
   (condp = field
-    :cert (#{:INFLUXDB_ENDPOINT :REST_ENDPOINT} dest)
-    :format (#{:AWS_TOPIC :AZURE_TOPIC :INFLUXDB_ENDPOINT :IOTCORE_TOPIC} dest)
-    :protocol (#{:AWS_TOPIC :AZURE_TOPIC :INFLUXDB_ENDPOINT :IOTCORE_TOPIC} dest)
-    :path (#{:AWS_TOPIC :AZURE_TOPIC :INFLUXDB_ENDPOINT :IOTCORE_TOPIC :XMPP_TOPIC} dest)
+    :cert (#{:REST_ENDPOINT} dest)
+    :format (#{:AWS_TOPIC :AZURE_TOPIC :IOTCORE_TOPIC} dest)
+    :protocol (#{:AWS_TOPIC :AZURE_TOPIC :IOTCORE_TOPIC} dest)
+    :path (#{:AWS_TOPIC :AZURE_TOPIC :IOTCORE_TOPIC :XMPP_TOPIC} dest)
     :password (#{:AWS_TOPIC :REST_ENDPOINT} dest)
     :user (#{:AWS_TOPIC :IOTCORE_TOPIC :REST_ENDPOINT} dest)
     :exp/port (#{:AWS_TOPIC :AZURE_TOPIC :IOTCORE_TOPIC} dest)
-    :exp/publisher (#{:AWS_TOPIC :INFLUXDB_ENDPOINT :REST_ENDPOINT :XMPP_TOPIC} dest)
+    :exp/publisher (#{:AWS_TOPIC :REST_ENDPOINT :XMPP_TOPIC} dest)
     :exp/topic (#{:REST_ENDPOINT :XMPP_TOPIC} dest)))
 
 (defn getRequiredFields
@@ -463,7 +463,6 @@
     1 [:exp/name]
     2 (cond
         (= :AWS_TOPIC dest) [:exp/address :exp/topic]
-        (= :INFLUXDB_ENDPOINT dest) [:exp/address :exp/port :exp/topic]
         (#{:AZURE_TOPIC :IOTCORE_TOPIC} dest) [:exp/address :exp/publisher :exp/topic]
         (#{:MQTT_TOPIC :REST_ENDPOINT :XMPP_TOPIC} dest) [:exp/address :exp/port]
         :else [])
@@ -543,7 +542,6 @@
     :ZMQ_TOPIC "ZMQ"
     :REST_ENDPOINT "REST"
     :AWS_TOPIC "AWS"
-    :INFLUXDB_ENDPOINT "InfluxDB"
     "Unknown"))
 
 (defn conv-format [_ format]

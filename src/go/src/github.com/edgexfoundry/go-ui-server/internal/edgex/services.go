@@ -8,11 +8,11 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
-	"github.com/gin-gonic/gin"
-	"math"
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -28,41 +28,75 @@ import (
 
 func Login(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	password := fulcro.GetString(args, "password")
-
-	saved, err := ioutil.ReadFile("./data/password")
-	if err != nil {
-		return nil, err
+	pw_file := os.Getenv("DATA_FILE")
+	var existing []byte
+	if pw_file == "" {
+		fmt.Println("No Password File.")
+	  	return nil, errors.New("Password File Path Not defined.")
 	}
-	expectedPassword := string(saved)
-	// remove last '\n' character of expectedPassword
-	expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
 
+	saved, err := ioutil.ReadFile(pw_file)
+	if err != nil {
+		// first login, file not exists
+		origin_pw := []byte("admin")
+		hashedBytes, err := bcrypt.GenerateFromPassword(origin_pw, bcrypt.DefaultCost)
+		existing = hashedBytes
+		if err != nil {
+			return  nil, err
+		}
+		err = ioutil.WriteFile(pw_file, hashedBytes, 0644)
+		if err != nil {
+			fmt.Println(err)
+			return  nil, err
+		}
+	} else {
+		expectedPassword := string(saved)
+		// remove last '\n' character of expectedPassword
+		expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
+		existing = []byte(expectedPassword)
+	}
 	incoming := []byte(password)
-	existing := []byte(expectedPassword)
 
 	if (bcrypt.CompareHashAndPassword(existing, incoming) != nil) {
 		return  nil, errors.New("Invalid Password")
 	}
+
 	return nil, nil
 }
 
 func ChangePassword(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
 	oldpw := fulcro.GetString(args, "oldpw")
 	newpw := fulcro.GetString(args, "newpw")
-
-	saved, err := ioutil.ReadFile("./data/password")
-	if err != nil {
-		return nil, err
+	pw_file := os.Getenv("DATA_FILE")
+	var existing []byte
+	if pw_file == "" {
+		fmt.Println("Password File Path Not defined.")
+		return nil, errors.New("Password File Path Not defined.")
 	}
-	expectedPassword := string(saved)
-	// remove last '\n' character of expectedPassword
-	expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
-
+	saved, err := ioutil.ReadFile(pw_file)
+	if err != nil {
+		// first login, file not exists
+		origin_pw := []byte("admin")
+		hashedBytes, err := bcrypt.GenerateFromPassword(origin_pw, bcrypt.DefaultCost)
+		existing = hashedBytes
+		if err != nil {
+			return  nil, err
+		}
+		err = ioutil.WriteFile(pw_file, hashedBytes, 0644)
+		if err != nil {
+			fmt.Println(err)
+			return  nil, err
+		}
+	} else {
+		expectedPassword := string(saved)
+		// remove last '\n' character of expectedPassword
+		expectedPassword = strings.TrimSuffix(expectedPassword, "\n")
+		existing = []byte(expectedPassword)
+	}
 	incoming := []byte(oldpw)
-	existing := []byte(expectedPassword)
-
 	err = bcrypt.CompareHashAndPassword(existing, incoming)
 	if err != nil {
+		fmt.Println(err)
 		return  nil, errors.New("Invalid Current Password")
 	}
 
@@ -71,8 +105,9 @@ func ChangePassword(params []interface{}, args map[interface{}]interface{}) (int
 	if err != nil {
 		return  nil, err
 	}
-	err = ioutil.WriteFile("./data/password", hashedBytes, 0644)
+	err = ioutil.WriteFile(pw_file, hashedBytes, 0644)
 	if err != nil {
+		fmt.Println(err)
 		return  nil, err
 	}
 	return nil, nil

@@ -60,14 +60,13 @@
                                            "compile" ["with-profile" "cljs" "run" "-m" "shadow.cljs.devtools.cli" "release" "main"]]}
              :production {}
              :cljs       {:source-paths ["src/main" "src/test" "src/cards"]
+                          :jvm-opts     ["-XX:-OmitStackTraceInFastThrow" "-Xmx1g"]
                           :dependencies [[binaryage/devtools "0.9.10"]
                                          [org.clojure/clojurescript "1.10.520"]
                                          [fulcrologic/fulcro-inspect "2.2.4"]]}
              :dev        {:source-paths ["src/dev" "src/main" "src/test" "src/cards"]
                           :jvm-opts     ["-XX:-OmitStackTraceInFastThrow" "-Xmx1g"]
-
                           :plugins      [[com.jakemccrary/lein-test-refresh "0.23.0"]]
-
                           :dependencies [[org.clojure/tools.namespace "0.3.0-alpha4"]
                                          [org.clojure/tools.nrepl "0.2.13"]
                                          [cider/piggieback "0.3.10"]]
