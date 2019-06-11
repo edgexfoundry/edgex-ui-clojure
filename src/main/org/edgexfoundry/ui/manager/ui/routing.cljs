@@ -10,7 +10,8 @@
     [sibiro.core :as sibiro]
     [fulcro.client.primitives :as prim]
     [fulcro.client.logging :as log]
-    [org.edgexfoundry.ui.manager.ui.common :as co]))
+    [org.edgexfoundry.ui.manager.ui.common :as co]
+    [goog.net.cookies :as cks]))
 
 (def app-routing-tree
   (r/routing-tree
@@ -89,6 +90,11 @@
       state-map)
     (r/update-routing-links state-map sibiro-match)))
 
+(defn is-logged-in?
+  []
+  (let [cookie (cks/get "EDGEX_SESSION_ID")]
+    cookie))
+
 (defn set-route!*
   "Implementation of choosing a particular sibiro match. Used internally by the HTML5 history event implementation.
   Updates the UI only, unless the URI is invalid, in which case it redirects the UI and possibly generates new HTML5
@@ -98,9 +104,9 @@
         sm {:handler handler :route-params rp}]
     (cond
       (or (= :login handler)) (r/update-routing-links state-map sibiro-match)
-      (not (:logged-in? state-map)) (-> state-map
-                                        (assoc :loaded-uri (when @history (pushy/get-token @history)))
-                                        (redirect* {:handler :login}))
+      (not (is-logged-in?)) (-> state-map
+                                (assoc :loaded-uri (when @history (pushy/get-token @history)))
+                                (redirect* {:handler :login}))
       (invalid-route? handler) (redirect* state-map {:handler :main})
       :else (-> state-map
                 (r/update-routing-links sm)

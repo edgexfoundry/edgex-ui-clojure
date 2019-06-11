@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -20,7 +19,10 @@ import (
 	"time"
 
 	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/russolsen/transit"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"gopkg.in/resty.v1"
@@ -60,8 +62,10 @@ func Login(params []interface{}, args map[interface{}]interface{}) (interface{},
 	if (bcrypt.CompareHashAndPassword(existing, incoming) != nil) {
 		return  nil, errors.New("Invalid Password")
 	}
+	session_id, _ := uuid.NewUUID()
+	result := map[transit.Keyword]string{transit.Keyword("session_id"): session_id.String()}
 
-	return nil, nil
+	return result, nil
 }
 
 func ChangePassword(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {

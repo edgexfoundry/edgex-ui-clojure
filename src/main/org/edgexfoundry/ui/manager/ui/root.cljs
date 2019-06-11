@@ -387,7 +387,6 @@
                             :ui/endpoint-modal (prim/get-initial-state ep/EndpointModal {})
                             :ui/logout-modal    (prim/get-initial-state lg/LogoutModal {})
                             :top-router         (prim/get-initial-state TopRouter {})
-                            :logged-in?          false
                             :pw-updated?         false}
                            r/app-routing-tree))
    :query         [:ui/locale :ui/react-key
@@ -400,7 +399,6 @@
                    {:top-router         (prim/get-query TopRouter)}
                    :ui/loading-data
                    fulcro.client.routing/routing-tree-key
-                   :logged-in?
                    :pw-updated?]}
   (let [delete-cbs {:da-modal a/do-delete-addressable
                     :dd-modal dv/do-delete-device
