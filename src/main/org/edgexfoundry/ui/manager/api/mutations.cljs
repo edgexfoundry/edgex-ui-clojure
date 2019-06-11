@@ -12,6 +12,7 @@
     [org.edgexfoundry.ui.manager.api.util :as u]
     [cljs-time.coerce :as ct]
     [cljs-time.format :as ft]
+    [goog.net.cookies :as cks]
     [pushy.core :as pushy]))
 
 (defmutation login-complete
@@ -22,18 +23,20 @@
           ; idempotent (start routing)
           (when app-root
             (r/start-routing app-root))
-          (swap! state (fn [s] (-> s
+          (swap! state (fn [s] (let [session (get-in s (conj co/login-page-ident :session_id))]
+                                 (cks/set "EDGEX_SESSION_ID" session 3600)
+                                 (-> s
                                    (assoc-in (conj co/login-page-ident :ui/password) "")
-                                   (assoc :logged-in? true :pw-updated? false :fulcro/server-error nil))))
+                                   (assoc :pw-updated? false :fulcro/server-error nil)))))
           (r/nav-to! component :main)))
 
 (defmutation logout
   "Fulcro mutation: Removes user identity from the local app and asks the server to forget the user as well."
   [p]
   (action [{:keys [component state]}]
-          (swap! state assoc :logged-in? false)
           (when (and @r/use-html5-routing @r/history)
-            (pushy/set-token! @r/history "/login"))))
+            (pushy/set-token! @r/history "/login"))
+          (cks/remove "EDGEX_SESSION_ID")))
 
 (defmutation upload-profile
   "Upload profile"
