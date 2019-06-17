@@ -117,13 +117,21 @@
                (e/edgex-delete :metadata))))
 
 (defmutation add-schedule-event
-  [{:keys [tempid name parameters schedule-name service-name addressable-name]}]
+  [{:keys [tempid name parameters schedule-name service-name protocol httpMethod address port path publisher topic user password]}]
   (action [{:keys [state]}]
-          (let [event {:name name
-                       :addressable {:name addressable-name}
-                       :parameters parameters
-                       :schedule schedule-name
-                       :service service-name}]
+          (let [event {:name        name
+                       :parameters  parameters
+                       :interval    schedule-name
+                       :target      service-name
+                       :protocol    protocol
+                       :httpMethod  httpMethod
+                       :address     address
+                       :port        port
+                       :path        path
+                       :publisher   publisher
+                       :topic       topic
+                       :user        user
+                       :password    password}]
             (timbre/info "add schedule event" name service-name)
             {::prim/tempids {tempid (-> (e/edgex-post :metadata "scheduleevent" event) :body keyword)}})))
 

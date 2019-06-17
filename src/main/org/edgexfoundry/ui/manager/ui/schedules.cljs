@@ -6,14 +6,18 @@
   (:require [org.edgexfoundry.ui.manager.ui.table :as t :refer [deftable]]
             [org.edgexfoundry.ui.manager.ui.dialogs :as d]
             [fulcro.client.primitives :as prim :refer [defui defsc]]
-            [fulcro.client.dom :as dom]
+            [fulcro.client.localized-dom :as dom]
             [fulcro.client.routing :as r]
+            [fulcro.i18n :refer [tr]]
             [fulcro.ui.forms :as f]
+            [fulcro.ui.form-state :as fs]
             [fulcro.ui.bootstrap3 :as b]
             [org.edgexfoundry.ui.manager.api.mutations :as mu]
             [org.edgexfoundry.ui.manager.ui.routing :as rt]
             [org.edgexfoundry.ui.manager.ui.common :as co]
             [org.edgexfoundry.ui.manager.ui.date-time-picker :as dtp]
+            [org.edgexfoundry.ui.manager.ui.devices :as dv]
+            [org.edgexfoundry.ui.manager.ui.load :as ld]
             [org.edgexfoundry.ui.manager.ui.routing :as routing]
             [fulcro.client.mutations :as m :refer [defmutation]]
             [fulcro.client.data-fetch :as df]
@@ -41,11 +45,12 @@
   (let [schedule (-> state :schedule id)
         schedule-name (:name schedule)
         events (vals (:schedule-event state))
-        selected-events (filter #(= schedule-name (:schedule %)) events)
+        selected-events (filter #(= schedule-name (:interval %)) events)
         gen-refs (fn [se] [:schedule-event (:id se)])
         content (mapv gen-refs selected-events)]
     (-> state
         (assoc-in [:show-schedule-events :singleton :content] content)
+        (assoc-in [:show-schedule-events :singleton :schedule-id] id)
         (assoc-in (conj co/new-schedule-event-ident :schedule) schedule))))
 
 (defmutation prepare-schedule-events
@@ -54,9 +59,18 @@
                      (swap! state (fn [s] (-> s
                                               (set-schedule-events* id))))))
 
+(defmutation load-schedules
+  [{:keys [id]}]
+  (action [{:keys [state] :as env}]
+          (ld/load-action env :q/edgex-schedule-events dv/ScheduleEventListEntry
+                          {:target (conj co/device-list-ident :schedule-events)
+                           :post-mutation `prepare-schedule-events
+                           :post-mutation-params {:id id}}))
+  (remote [env] (df/remote-load env)))
+
 (defn show-schedule-events [this type id]
   (prim/transact! this `[(prepare-schedule-events {:id ~id})])
-  (rt/nav-to! this :schedule-event))
+  (rt/nav-to! this :schedule-event {:id id}))
 
 (defn show-schedule-event-info [this type id]
   (rt/nav-to! this :schedule-event-info {:id id}))
@@ -65,16 +79,25 @@
 
 (declare ScheduleEventList)
 
-(defn add-new-schedule-event [comp {:keys [name parameters schedule service address-data] :as form}]
+(defn add-new-schedule-event [comp {:keys [name parameters schedule service target protocol httpMethod address port path publisher topic user password] :as form}]
   (let [tmp-id (prim/tempid)]
     (f/reset-from-entity! comp form)
-    (prim/transact! comp `[(mu/add-schedule-event {:tempid ~tmp-id
-                                                   :name ~name
-                                                   :parameters ~parameters
+    (prim/transact! comp `[(mu/add-schedule-event {:tempid        ~tmp-id
+                                                   :name          ~name
+                                                   :parameters    ~parameters
                                                    :schedule-name ~(:name schedule)
-                                                   :service-name ~(:name service)
-                                                   :addressable-name ~(:name address-data)})
-                           (b/hide-modal {:id :add-schedule-event-modal})])))
+                                                   :target        ~target
+                                                   :protocol      ~protocol
+                                                   :httpMethod    ~httpMethod
+                                                   :address       ~address
+                                                   :port          ~port
+                                                   :path          ~path
+                                                   :publisher     ~publisher
+                                                   :topic         ~topic
+                                                   :user          ~user
+                                                   :password      ~password})
+                           (b/hide-modal {:id :add-schedule-event-modal})
+                           (df/fallback {:action ld/reset-error})])))
 
 (defn assoc-options [state field opts default]
   (let [path (into co/new-schedule-event-ident [:fulcro.ui.forms/form :elements/by-name field])]
@@ -103,7 +126,7 @@
                (mapv #(f/option (:id %) (:name %)) services))
         default (or (-> services first) :none)]
     (-> state
-        (assoc-options :service opts default))))
+        (assoc-options :target opts default))))
 
 (defn reset-add-schedule-event* [state]
   (-> state
@@ -112,21 +135,14 @@
       (assoc-in (conj co/new-schedule-event-ident :parameters) "")))
 
 (defn set-new-schedule-data* [state]
-  (let [service-id (get-in state (conj co/new-schedule-event-ident :service))
-        service (-> state :device-service service-id)
-        addr-id (get-in state (conj co/new-schedule-event-ident :addressable))
-        addr (-> state :addressable addr-id)]
-    (-> state
-        (assoc-in (conj co/new-schedule-event-ident :confirm?) true)
-        (assoc-in (conj co/new-schedule-event-ident :service-data) service)
-        (assoc-in (conj co/new-schedule-event-ident :address-data) addr))))
+  (-> state
+      (assoc-in (conj co/new-schedule-event-ident :confirm?) true)))
 
 (defmutation prepare-add-schedule-event
   [noargs]
   (action [{:keys [state]}]
           (swap! state (fn [s] (-> s
                                    (set-available-addressables*)
-                                   (set-schedule-services*)
                                    (reset-add-schedule-event*))))))
 
 (defmutation prepare-confirm-add-schedule-event
@@ -166,23 +182,27 @@
                            :show-schedules])
     (df/load comp co/device-list-ident ScheduleList {:fallback `d/show-error})))
 
+(declare AddScheduleModal)
+
 (defn reset-add-schedule* [state]
-  (let [now (-> (tc/now) (ct/to-long))]
+  (let [ref co/new-schedule-ident
+        now (-> (tc/now) (ct/to-long))]
     (-> state
         (assoc-in [:date-time-picker :schedule-start :time] now)
         (assoc-in [:date-time-picker :schedule-end :time] now)
         (assoc-in [:date-time-picker :schedule-start :no-default?] true)
         (assoc-in [:date-time-picker :schedule-end :no-default?] true)
         (assoc-in [:new-schedule :singleton :confirm?] false)
-        (assoc-in (conj co/new-schedule-ident :name) "")
-        (assoc-in (conj co/new-schedule-ident :frequency) "")
-        (assoc-in (conj co/new-schedule-ident :run-once) false))))
+        (assoc-in (conj ref :name) "")
+        (assoc-in (conj ref :frequency) "")
+        (assoc-in (conj ref :run-once) false))))
 
 (defmutation prepare-add-schedule
   [noargs]
   (action [{:keys [state]}]
           (swap! state (fn [s] (-> s
-                                   (reset-add-schedule*))))))
+                                   (reset-add-schedule*)
+                                   )))))
 
 (defn show-add-schedule-modal [comp]
   (prim/transact! comp `[(prepare-add-schedule {})
@@ -190,39 +210,73 @@
                          (b/show-modal {:id :add-schedule-modal})
                          :modal-router]))
 
-(defn schedule-event-table [name parameters service addressable schedule]
+(defn schedule-event-table [name parameters target schedule protocol httpMethod address port path publisher topic]
   (let [if-avail #(or % "N/A")]
-    (dom/div
-      #js {:className "table-responsive"}
-      (dom/table
-        #js {:className "table table-bordered"}
-        (dom/tbody nil
-                   (t/row "Name" name)
-                   (t/row "Parameters" (if (str/blank? parameters) "N/A" parameters))
-                   (t/row "Service" (if-avail (:name service)))
-                   (t/row "Addressable" (if-avail (:url addressable)))
-                   (dom/tr nil
-                           (dom/th #js {:rowSpan "5"} "Schedule")
-                           (dom/th nil "Name")
-                           (dom/td nil (:name schedule)))
-                   (t/subrow "Start" (if-avail (:start schedule)))
-                   (t/subrow "End" (if-avail (:end schedule)))
-                   (t/subrow "Run Once" (-> schedule :runOnce str)))))))
 
-(defsc AddScheduleEventModal [this {:keys [modal name parameters service schedule address-data confirm? modal/page] :as props}]
+    (dom/div :$schedule$container-fluid
+             (dom/div :$row$row-no-gutters
+                      (dom/div :$col-xs-4$col-md-3 (tr "Name"))
+                      (dom/div :$col-xs-8$col-md-9 name))
+             (dom/div :$row$row-no-gutters
+                      (dom/div :$col-xs-4$col-md-3 (tr "Parameters"))
+                      (dom/div :$col-xs-8$col-md-9 (if (str/blank? parameters) "N/A" parameters)))
+             (dom/div :$row$row-no-gutters
+                      (dom/div :$col-xs-4$col-md-3 (tr "Service"))
+                      (dom/div :$col-xs-8$col-md-9 (if-avail target)))
+
+             (dom/div :$row
+                      (dom/div :$col-xs-4$col-md-3$schedule-title "Schedule")
+                      (dom/div :$col-xs-4$col-md-3 "Name"
+                               (dom/div :$short-div (tr "Start"))
+                               (dom/div :$short-div (tr "End"))
+                               (dom/div :$short-div (tr "Run Once")))
+                      (dom/div :$col-xs-4$col-md-6 (:name schedule)
+                               (dom/div :$short-div (if-avail (:start schedule)))
+                               (dom/div :$short-div (if-avail (:end schedule)))
+                               (dom/div :$short-div (if (nil? (:runOnce schedule)) "false" (-> schedule :runOnce str)))))
+             (dom/div :$row
+                      (dom/div :$col-xs-4$col-md-3$address-title (tr "Address"))
+                      (dom/div :$col-xs-4$col-md-3 (tr "Protocol")
+                               (dom/div :$short-div (tr "HTTP Method"))
+                               (dom/div :$short-div (tr "Address"))
+                               (dom/div :$short-div (tr "Port"))
+                               (dom/div :$short-div (tr "Path"))
+                               (dom/div :$short-div (tr "Publisher"))
+                               (dom/div :$short-div (tr "Topic")))
+                      (dom/div :$col-xs-4$col-md-6 protocol
+                               (dom/div :$short-div (co/conv-http-method httpMethod))
+                               (dom/div :$short-div address)
+                               (dom/div :$short-div port)
+                               (dom/div :$short-div path)
+                               (dom/div :$short-div publisher)
+                               (dom/div :$short-div topic))))))
+
+(defsc AddScheduleEventModal [this {:keys [modal name parameters target schedule protocol httpMethod address port path publisher topic confirm? modal/page] :as props}]
   {:initial-state (fn [p] (merge (f/build-form this {:db/id 4})
                                  {:confirm? false
                                   :modal (prim/get-initial-state b/Modal {:id :add-schedule-event-modal :backdrop true})
                                   :modal/page :new-schedule-event}))
    :ident (fn [] co/new-schedule-event-ident)
-   :query [f/form-key :db/id :confirm? :name :parameters :schedule :service :addressable :service-data :address-data :schedule
+   :query [f/form-key :db/id :confirm? :name :parameters :schedule :target :protocol :httpMethod :address :port :path :publisher :topic :user :password
            :confirm? :modal/page
            {:modal (prim/get-query b/Modal)}]
    :form-fields [(f/id-field :db/id)
                  (f/text-input :name :placeholder "Name of the Schedule Event" :validator `f/not-empty?)
                  (f/text-input :parameters :placeholder "Parameters")
-                 (f/dropdown-input :service [(f/option :none "No services available")])
-                 (f/dropdown-input :addressable [(f/option :none "No addressable available")])]}
+                 (f/text-input :target :placeholder "Target")
+                 (f/text-input :protocol)
+                 (f/text-input :address :validator `f/not-empty?)
+                 (f/integer-input :port)
+                 (f/text-input :path)
+                 (f/dropdown-input :httpMethod [(f/option :get "GET")
+                                                (f/option :post "POST")
+                                                (f/option :put "PUT")
+                                                (f/option :delete "DELETE")]
+                                   :default-value :get)
+                 (f/text-input :publisher)
+                 (f/text-input :topic)
+                 (f/text-input :user)
+                 (f/text-input :password)]}
   (let [valid? (f/valid? (f/validate-fields props))]
     (b/ui-modal modal
                 (b/ui-modal-title nil
@@ -237,13 +291,20 @@
                                                               (dom/div #js {:className "col-md-12"}
                                                                        (dom/div #js {:className "header"}
                                                                                 (dom/h4 #js {:className "title"} "Schedule Event"))
-                                                                       (schedule-event-table name parameters service address-data
-                                                                                             schedule))))
-                                            (dom/div #js {:className "content"}
+                                                                       (schedule-event-table name parameters target schedule protocol httpMethod address port path publisher topic))))
+                                            (dom/div {:className "content"}
                                                      (co/field-with-label this props :name "Name" :className "form-control")
                                                      (co/field-with-label this props :parameters "Parameters" :className "form-control")
-                                                     (co/field-with-label this props :service "Service" :className "form-control")
-                                                     (co/field-with-label this props :addressable "Addressable" :className "form-control")))))
+                                                     (co/field-with-label this props :target "Target" :className "form-control")
+                                                     (co/field-with-label this props :protocol "Protocol" :className "form-control")
+                                                     (co/field-with-label this props :httpMethod "HTTP Method" :className "form-control")
+                                                     (co/field-with-label this props :address "Address" :className "form-control")
+                                                     (co/field-with-label this props :port "Port" :className "form-control")
+                                                     (co/field-with-label this props :path "Path" :className "form-control")
+                                                     (co/field-with-label this props :publisher "Publisher" :className "form-control")
+                                                     (co/field-with-label this props :topic "Topic" :className "form-control")
+                                                     (co/field-with-label this props :user "User" :className "form-control")
+                                                     (co/field-with-label this props :password "Password" :className "form-control")))))
                 (b/ui-modal-footer nil
                                    (when confirm?
                                      (b/button {:key "back-button" :className "btn-fill" :kind :info
@@ -341,41 +402,40 @@
                                              "Cancel")))))
 
 (defsc ScheduleEventInfo [this
-                          {:keys [id type name addressable schedule service created]}]
+                          {:keys [name interval target created protocol httpMethod address port path publisher topic] :as props}]
   {:ident [:schedule-event :id]
-   :query [:id :type :name :addressable :schedule :service :created]}
-  (dom/div nil
-           (dom/div
-            #js {:className "card"}
-            (dom/div
-             #js {:className "fixed-table-toolbar"}
-             (dom/div #js {:className "bars pull-right"}
-                      (b/button
-                       {:onClick #(routing/nav-to! this :schedule-event)}
-                       (dom/i #js {:className "glyphicon fa fa-caret-square-o-left"}))))
-            (dom/div #js {:className "header"}
-                     (dom/h4 #js {:className "title"} "Schedule Event"))
-            (dom/div
-             #js {:className "table-responsive"}
-             (dom/table
-              #js {:className "table table-bordered"}
-              (dom/tbody nil
-                         (t/row "Name" name)
-                         (t/row "Schedule" schedule)
-                         (t/row "Service" service)
-                         (t/row "Created" (co/conv-time created))
-                         (dom/tr nil
-                                 (dom/th #js {:rowSpan "5"} "Address")
-                                 (dom/th nil "Name")
-                                 (dom/td nil (:name addressable)))
-                         (t/subrow "Protocol" (:protocol addressable))
-                         (t/subrow "Address" (:address addressable))
-                         (t/subrow "Port" (:port addressable))
-                         (t/subrow "Path" (:path addressable))))))))
+   :query [:id :type :name :interval :target :created :protocol :httpMethod :address :port :path :publisher :topic
+           [:show-schedule-events :singleton]]}
+  (let [schedule-id (:schedule-id (get props [:show-schedule-events :singleton]))]
+    (dom/div nil
+             (dom/div {:className "card"}
+               (dom/div {:className "fixed-table-toolbar"}
+                 (dom/div {:className "bars pull-right"}
+                          (b/button
+                            {:onClick #(routing/nav-to! this :schedule-event {:id schedule-id})}
+                            (dom/i {:className "glyphicon fa fa-caret-square-o-left"}))))
+               (dom/div {:className "header"}
+                        (dom/h4 {:className "title"} "Schedule Event"))
+               (dom/div {:className "table-responsive"}
+                 (dom/table {:className "table table-bordered"}
+                   (dom/tbody nil
+                              (t/row (tr "Name") name)
+                              (t/row (tr "Schedule") interval)
+                              (t/row (tr "Target") target)
+                              (t/row (tr "Created") (co/conv-time created))
+                              (dom/tr nil
+                                      (dom/th {:rowSpan "8"} "Address"))
+                              (t/subrow (tr "Protocol") protocol)
+                              (t/subrow (tr "HTTP Method") httpMethod)
+                              (t/subrow (tr "Address") address)
+                              (t/subrow (tr "Port") port)
+                              (t/subrow (tr "Path") path)
+                              (t/subrow (tr "Publisher") publisher)
+                              (t/subrow (tr "Topic") topic))))))))
 
 (deftable ScheduleEventList :show-schedule-events :schedule-event [[:name "Name"]
-                                                                   [:addressable "Addressable" (fn [p v] (:name v))]
-                                                                   [:service "Service"]]
+                                                                   [:interval "Schedule"]
+                                                                   [:target "Target"]]
   [{:onClick #(show-add-schedule-event-modal this) :icon "plus"}
    {:onClick #(rt/nav-to! this :schedule) :icon "caret-square-o-left"}]
   :modals [{:modal d/DeleteModal :params {:modal-id :dse-modal} :callbacks {:onDelete do-delete-schedule-event}}]

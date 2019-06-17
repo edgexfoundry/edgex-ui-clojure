@@ -137,28 +137,34 @@
   (remote [env] true))
 
 (defmutation add-schedule-event
-  [{:keys [tempid name parameters schedule-name service-name addressable-name]}]
+  [{:keys [tempid name parameters schedule-name target protocol httpMethod address port path publisher topic user password]}]
   (action [{:keys [state]}]
-          (let [filter-by-name (fn [list] (filterv #(= (:name %) addressable-name) list))
-                get-addr (fn [s] (-> s :addressable vals filter-by-name first))
-                e {:created    0
+          (let [e {:created    0
                    :id         tempid
                    :modified   0
                    :name       name
                    :parameters parameters
                    :origin     0
-                   :schedule   schedule-name
-                   :service    service-name
+                   :interval   schedule-name
+                   :target     target
+                   :protocol   protocol
+                   :httpMethod (co/conv-http-method httpMethod)
+                   :address    address
+                   :port       port
+                   :path       path
+                   :publisher  publisher
+                   :topic      topic
+                   :user       user
+                   :password   password
                    :type       :schedule-event}]
-            (swap! state (fn [s] (let [se (assoc e :addressable (get-addr s))
-                                       add-ref #(conj % [:schedule-event tempid])]
+            (swap! state (fn [s] (let [add-ref #(conj % [:schedule-event tempid])]
                                    (-> s
-                                       (assoc-in [:schedule-event tempid] se)
+                                       (assoc-in [:schedule-event tempid] e)
                                        (update-in [:show-schedule-events :singleton :content] add-ref)))))))
   (remote [env] true))
 
 (defmutation add-schedule
-  [{:keys [tempid name start end frequency run-once]}]
+  [{:keys [tempid name start end frequency cron run-once]}]
   (action [{:keys [state]}]
           (let [sc {:created    0
                     :cron       nil

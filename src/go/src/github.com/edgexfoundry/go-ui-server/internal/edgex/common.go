@@ -7,6 +7,7 @@ const (
 	ClientCommand       = "command"
 	ClientExport        = "export"
 	ClientNotifications = "notifications"
+	ClientScheduler     = "scheduler"
 
 	APIv1Prefix    = "/api/v1"
 	Colon          = ":"

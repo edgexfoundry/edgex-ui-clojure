@@ -114,6 +114,14 @@
     :TRXESCALATED "Trxescalated"
     "Unknown"))
 
+(defn conv-http-method [method]
+  (case method
+    :post "POST"
+    :put "PUT"
+    :delete "DELETE"
+    :get "GET"
+    "GET"))
+
 (defn time-now []
   (co/to-long (tc/now)))
 
