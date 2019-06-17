@@ -63,7 +63,7 @@
    [:get "/reading" :reading]
    [:get "/profile" :profile]
    [:get "/schedule" :schedule]
-   [:get "/schedule-event" :schedule-event]
+   [:get "/schedule-event/:id{[0-9a-f-]+}" :schedule-event]
    [:get "/schedule-event-info/:id{[0-9a-f-]+}" :schedule-event-info]
    [:get "/profile-yaml" :profile-yaml]
    [:get "/addressable" :addressable]
@@ -123,6 +123,16 @@
 (defn key-to-string [k]
   (subs (str k) 1))
 
+(defn load-route-data [comp page route-params]
+   (condp = page
+     :control (let [id (-> route-params :id keyword)]
+                (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.devices/load-commands {:id ~id})]))
+     :schedule-event (let [id (-> route-params :id keyword)]
+                       (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.schedules/load-schedules {:id ~id})]))
+     :export (let [id (-> route-params :id keyword)]
+                       (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.exports/load-exports {:id ~id})]))
+     page))
+
 (defn nav-to!
   "Run a navigation mutation from the UI, but make sure that HTML5 routing is correctly honored so the components can be
   used as an app or in devcards. Use this in nav UI links instead of href or transact. "
@@ -140,10 +150,13 @@
 
 (defn start-routing [app-root]
   (when (and @use-html5-routing (not @history))
-    (let [; NOTE: the :pages follow-on read, so the whole UI updates when page changes
+    (let [; NOTE: the :device-page follow-on read, so the whole UI updates when page changes
           set-route! (fn [match]
                        ; Delay. history events should happen after a tx is processed, but a set token could happen during.
                        ; Time doesn't matter. This thread has to let go of the CPU before timeouts can process.
-                       (js/setTimeout #(prim/transact! app-root `[(set-route! ~match) :top-router]) 10))]
+                       (js/setTimeout (fn []
+                                        (let [{:keys [handler route-params]} match]
+                                          (load-route-data app-root handler route-params)
+                                          (prim/transact! app-root `[(set-route! ~match) :top-router]))) 10))]
       (reset! history (pushy/pushy set-route! match-uri))
-         (pushy/start! @history))))
+      (pushy/start! @history))))

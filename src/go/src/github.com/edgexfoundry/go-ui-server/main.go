@@ -29,6 +29,7 @@ func main() {
 	server.AddQueryFunc("q/edgex-profile-yaml", edgex.ProfileYaml)
 	server.AddQueryFunc("q/edgex-commands", edgex.Commands)
 	server.AddQueryFunc("q/edgex-readings", edgex.DeviceReadings)
+	server.AddQueryFunc("q/edgex-value-descriptors", edgex.ValueDescriptors)
 	server.AddQueryFunc("show-schedules", edgex.ShowSchedules)
 	server.AddQueryFunc("show-exports", edgex.ShowExports)
 	server.AddQueryFunc("show-notifications", edgex.ShowNotifications)

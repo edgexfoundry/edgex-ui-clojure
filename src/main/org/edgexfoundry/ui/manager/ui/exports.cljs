@@ -36,14 +36,21 @@
   (action [{:keys [state]}]
           (swap! state (fn [s] (let [deviceIDs (mapv #(last %) (get-in s [:show-devices :singleton :content]))
                                      deviceNames (mapv #(get-in s [:device % :name]) deviceIDs)
-                                     profileIDs (mapv #(last %) (get-in s [:show-profiles :singleton :content]))
-                                     readings (reduce (fn [col id]
-                                                        (let [resources (get-in s [:device-profile id :deviceCommands])
-                                                              profileName (get-in s [:device-profile id :name])]
-                                                          (mapv #(hash-map :id (-> (:get %)(first)(:object)), :name (-> (:get %)(first)(:object)), :profile profileName) resources))) [] profileIDs)]
+                                     valueDescriptors (-> s :value-descriptor vals)
+                                     readings (into [] (mapv #(hash-map :id (:name %) :name (:name %)) valueDescriptors))]
                                  (-> s
                                      (assoc-in  [::export-devices :singleton] deviceNames)
                                      (assoc-in  [::export-readings :singleton] readings)))))))
+
+(defsc ValueDescriptorListEntry [this {:keys [id name]}]
+  {:ident [:value-descriptor :id]
+   :query [:id :name]})
+
+(defmutation load-exports
+  [{:keys [id]}]
+  (action [{:keys [state] :as env}]
+          (ld/load-action env :q/edgex-value-descriptors ValueDescriptorListEntry {}))
+  (remote [env] (df/remote-load env)))
 
 (defn prepare-export* [state new-mode?]
   (let [ref co/new-export-ident
@@ -436,11 +443,11 @@
                                                          :onChange (fn [v] (m/set-value! this :device-filter v))})))
              (co/input-with-label this :reading-filter "Reading filter" "" "" nil nil
                                   (fn [attrs]
-                                    (ui-multiselect #js {:data   readings :valueField "id" :textField "name" :groupBy "profile" :placeholder "Type to filter readings..."
-                                                         :filter "contains" :value (clj->js reading-filter)
-                                                         :onChange (fn [v]
-                                                                     (let [readings (mapv #(. % -name) v)]
-                                                                       (m/set-value! this :reading-filter readings)))}))))))
+                                    (ui-multiselect {:data   readings :valueField "id" :textField "name" :placeholder "Type to filter readings..."
+                                                     :filter "contains" :value (clj->js reading-filter)
+                                                     :onChange (fn [v]
+                                                                  (let [readings (mapv #(. % -name) v)]
+                                                                    (m/set-value! this :reading-filter readings)))}))))))
 
 (def ui-exp-filter-entry (prim/factory ExpFilterEntry))
 
@@ -546,9 +553,11 @@
 
 (defn conv-format [_ format]
   (case format
+    :CSV "CSV"
     :JSON "JSON"
     :XML "XML"
     :IOTCORE_JSON "JSON (IoT Core)"
+    :AWS_JSON "JSON (AWS)"
     :AZURE_JSON "JSON (Azure)"
     :THINGSBOARD_JSON "JSON (ThingsBoard)"
     :NOOP "None"
