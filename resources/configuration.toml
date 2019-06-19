@@ -31,3 +31,8 @@
   Protocol = "http"
   Host = "edgex-support-notifications"
   Port = 48060
+
+  [Clients.Scheduler]
+  Protocol = "http"
+  Host = "edgex-support-scheduler"
+  Port = 48085

@@ -10,7 +10,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gin-gonic/gin"
 	"io/ioutil"
 	"math"
 	"net/http"
@@ -20,7 +19,10 @@ import (
 	"time"
 
 	"github.com/edgexfoundry/go-ui-server/internal/fulcro"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/russolsen/transit"
+
 	"golang.org/x/crypto/bcrypt"
 
 	"gopkg.in/resty.v1"
@@ -60,8 +62,10 @@ func Login(params []interface{}, args map[interface{}]interface{}) (interface{},
 	if (bcrypt.CompareHashAndPassword(existing, incoming) != nil) {
 		return  nil, errors.New("Invalid Password")
 	}
+	session_id, _ := uuid.NewUUID()
+	result := map[transit.Keyword]string{transit.Keyword("session_id"): session_id.String()}
 
-	return nil, nil
+	return result, nil
 }
 
 func ChangePassword(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
@@ -347,17 +351,24 @@ func getReadingsInTimeRange(name string, from int64, to int64) (interface{}, err
 			if reading["device"].(string) != name {
 				continue
 			}
-			//check floatEncoding
-			valueDesName := reading["name"].(string)
-			resp, err := resty.R().Get(getEndpoint(ClientData) + "valuedescriptor/name/" + valueDesName)
-			var valueDesData map[string]interface{}
-			json.Unmarshal(resp.Body(), &valueDesData)
-			if err == nil && valueDesData["floatEncoding"] != nil && valueDesData["floatEncoding"].(string) == "Base64"{
-				float32_value := reading["value"].(string)
-				decodeValue, _ := base64.StdEncoding.DecodeString(float32_value)
-				bits := binary.LittleEndian.Uint32(decodeValue)
-				reading["value"] = math.Float32frombits(bits)
+
+			// check float32/float64 base64 encoding, should be a 8 or 12 chars long string
+			valueStr := reading["value"].(string)
+			valueLen := len(valueStr)
+			if (valueLen == 8 || valueLen == 12) && strings.HasSuffix(valueStr, "=") {
+				base64string := valueStr
+				decodeValue, _ := base64.StdEncoding.DecodeString(base64string)
+				if valueLen == 8 {
+					// handle float32 bits
+					bits := binary.LittleEndian.Uint32(decodeValue)
+					reading["value"] = math.Float32frombits(bits)
+				} else {
+					// handle float64 bits
+					bits := binary.LittleEndian.Uint64(decodeValue)
+					reading["value"] = math.Float64frombits(bits)
+				}
 			}
+
 			id := reading["id"].(string)
 			if !ids[id] {
 				ids[id] = true
@@ -415,7 +426,7 @@ func getSchedules() (interface{}, error) {
 	var result interface{}
 	var data []map[string]interface{}
 
-	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "schedule")
+	resp, err := resty.R().Get(getEndpoint(ClientScheduler) + "interval")
 
 	if err == nil {
 		json.Unmarshal(resp.Body(), &data)
@@ -430,7 +441,7 @@ func getScheduleEvents() (interface{}, error) {
 	var result interface{}
 	var data []map[string]interface{}
 
-	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "scheduleevent")
+	resp, err := resty.R().Get(getEndpoint(ClientScheduler) + "intervalaction")
 
 	if err == nil {
 		json.Unmarshal(resp.Body(), &data)
@@ -679,6 +690,24 @@ func ReadingPage(params []interface{}, args map[interface{}]interface{}) (interf
 	return fulcro.Keywordize(result, err)
 }
 
+func ValueDescriptors(params []interface{}, args map[interface{}]interface{}) (interface{}, error) {
+	return fulcro.Keywordize(getValueDescriptors())
+}
+
+
+func getValueDescriptors() (interface{}, error) {
+	var data []map[string]interface{}
+	var result interface{}
+
+	resp, err := resty.R().Get(getEndpoint(ClientData) + "valuedescriptor")
+	if err == nil {
+		json.Unmarshal(resp.Body(), &data)
+		result = fulcro.AddType(data, "valuedescriptor")
+		result = fulcro.MakeKeyword(result, "id")
+	}
+	return fulcro.Keywordize(result, err)
+}
+
 func UpdateLockMode(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	mode := fulcro.GetKeyword(args, "mode")
@@ -881,7 +910,7 @@ type Schedule struct {
 	Start     string `json:"start"`
 	End       string `json:"end"`
 	Frequency string `json:"frequency"`
-	RunOnce   bool   `json:"run-once"`
+	RunOnce   bool   `json:"runOnce"`
 }
 
 func AddSchedule(args map[interface{}]interface{}) (interface{}, error) {
@@ -899,7 +928,7 @@ func AddSchedule(args map[interface{}]interface{}) (interface{}, error) {
 		Frequency: frequency,
 		RunOnce:   runOnce,
 	}
-	resp, err := resty.R().SetBody(schedule).Post(getEndpoint(ClientMetadata) + "schedule")
+	resp, err := resty.R().SetBody(schedule).Post(getEndpoint(ClientScheduler) + "interval")
 	if err == nil {
 		result = fulcro.MkTempIdResult(tempid, resp)
 	}
@@ -908,34 +937,59 @@ func AddSchedule(args map[interface{}]interface{}) (interface{}, error) {
 
 func DeleteSchedule(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "schedule/id/" + string(id))
+	_, err := resty.R().Delete(getEndpoint(ClientScheduler) + "interval/" + string(id))
 	return id, err
 }
 
 type ScheduleEvent struct {
 	Name        string `json:"name,omitempty"`
-	Addressable Named  `json:"addressable"`
 	Parameters  string `json:"parameters"`
-	Schedule    string `json:"schedule"`
-	Service     string `json:"service"`
+	Interval    string `json:"interval"`
+	Target      string `json:"target"`
+	Address     string `json:"address"`
+	Protocol    string `json:"protocol,omitempty"`
+	Port        int64  `json:"port,omitempty"`
+	Path        string `json:"path"`
+	HTTPMethod  string `json:"httpMethod,omitempty"`
+	Publisher   string `json:"publisher,omitempty"`
+	Topic       string `json:"topic,omitempty"`
+	User        string `json:"user,omitempty"`
+	Password    string `json:"password,omitempty"`
 }
 
 func AddScheduleEvent(args map[interface{}]interface{}) (interface{}, error) {
 	var result interface{}
 	tempid := fulcro.GetTempId(args, "tempid")
 	name := fulcro.GetString(args, "name")
-	addressableName := fulcro.GetString(args, "addressable-name")
 	parameters := fulcro.GetString(args, "parameters")
-	schedule := fulcro.GetString(args, "schedule-name")
-	service := fulcro.GetString(args, "service-name")
+	interval := fulcro.GetString(args, "schedule-name")
+	target := fulcro.GetString(args, "target")
+	protocol := fulcro.GetString(args, "protocol")
+	httpMethod := strings.ToUpper(string(fulcro.GetKeyword(args, "httpMethod")))
+	address := fulcro.GetString(args, "address")
+	port := fulcro.GetInt(args, "port")
+	path := fulcro.GetString(args, "path")
+	publisher := fulcro.GetString(args, "publisher")
+	topic := fulcro.GetString(args, "topic")
+	user := fulcro.GetString(args, "user")
+	password := fulcro.GetString(args, "password")
+
 	scheduleEvent := ScheduleEvent{
 		Name:        name,
-		Addressable: Named{Name: addressableName},
 		Parameters:  parameters,
-		Schedule:    schedule,
-		Service:     service,
+		Interval:    interval,
+		Target:     target,
+		Protocol:   protocol,
+		HTTPMethod: httpMethod,
+		Address:    address,
+		Port:       port,
+		Path:       path,
+		Publisher:  publisher,
+		Topic:      topic,
+		User:       user,
+		Password:   password,
 	}
-	resp, err := resty.R().SetBody(scheduleEvent).Post(getEndpoint(ClientMetadata) + "scheduleevent")
+	resp, err := resty.R().SetBody(scheduleEvent).Post(getEndpoint(ClientScheduler) + "intervalaction")
 	if err == nil {
 		result = fulcro.MkTempIdResult(tempid, resp)
 	}
@@ -944,7 +998,7 @@ func AddScheduleEvent(args map[interface{}]interface{}) (interface{}, error) {
 
 func DeleteScheduleEvent(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "scheduleevent/id/" + string(id))
+	_, err := resty.R().Delete(getEndpoint(ClientScheduler) + "intervalaction/" + string(id))
 	return id, err
 }
 

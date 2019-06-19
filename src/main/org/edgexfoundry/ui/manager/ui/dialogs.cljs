@@ -20,11 +20,10 @@
   (let [hide-modal (fn [modal-id] (prim/transact! this `[(b/hide-modal {:id ~modal-id})]))]
        (b/ui-modal modal
                    (b/ui-modal-title nil
-                                     (dom/div #js {:key "title"
-                                                   :style #js {:fontSize "22px"}} "Confirm Delete"))
+                                     (dom/div {:key "title"
+                                               :style {:fontSize "22px"}} "Confirm Delete"))
                    (b/ui-modal-body nil
-                                    (dom/div #js {:className "swal2-icon swal2-warning" :style #js {:display "block"}} "!")
-                                    (dom/p #js {:key "message" :className b/text-danger} (str "Delete " name "?")))
+                                    (dom/p {:key "message" :className b/text-danger} (str "Delete " name "?")))
                    (b/ui-modal-footer nil
                                       (b/button {:key "ok-button" :className "btn-fill" :kind :info
                                                  :onClick #(do

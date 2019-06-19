@@ -5,7 +5,7 @@
 (ns org.edgexfoundry.ui.manager.api.util)
 
 (defn mk-export [addressable format destination compression encryptionAlgorithm encryptionKey
-                 initializingVector reading-filter device-filter enable]
+                 initializingVector device-filter reading-filter enable]
   (let [addr (select-keys addressable [:address :method :name :origin :password :path :port :protocol
                                        :publisher :topic :user :cert :key])
                 ex {:addressable addr

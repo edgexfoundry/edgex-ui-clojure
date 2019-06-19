@@ -12,6 +12,7 @@
     [org.edgexfoundry.ui.manager.api.util :as u]
     [cljs-time.coerce :as ct]
     [cljs-time.format :as ft]
+    [goog.net.cookies :as cks]
     [pushy.core :as pushy]))
 
 (defmutation login-complete
@@ -22,18 +23,20 @@
           ; idempotent (start routing)
           (when app-root
             (r/start-routing app-root))
-          (swap! state (fn [s] (-> s
+          (swap! state (fn [s] (let [session (get-in s (conj co/login-page-ident :session_id))]
+                                 (cks/set "EDGEX_SESSION_ID" session 3600)
+                                 (-> s
                                    (assoc-in (conj co/login-page-ident :ui/password) "")
-                                   (assoc :logged-in? true :pw-updated? false :fulcro/server-error nil))))
+                                   (assoc :pw-updated? false :fulcro/server-error nil)))))
           (r/nav-to! component :main)))
 
 (defmutation logout
   "Fulcro mutation: Removes user identity from the local app and asks the server to forget the user as well."
   [p]
   (action [{:keys [component state]}]
-          (swap! state assoc :logged-in? false)
           (when (and @r/use-html5-routing @r/history)
-            (pushy/set-token! @r/history "/login"))))
+            (pushy/set-token! @r/history "/login"))
+          (cks/remove "EDGEX_SESSION_ID")))
 
 (defmutation upload-profile
   "Upload profile"
@@ -134,28 +137,34 @@
   (remote [env] true))
 
 (defmutation add-schedule-event
-  [{:keys [tempid name parameters schedule-name service-name addressable-name]}]
+  [{:keys [tempid name parameters schedule-name target protocol httpMethod address port path publisher topic user password]}]
   (action [{:keys [state]}]
-          (let [filter-by-name (fn [list] (filterv #(= (:name %) addressable-name) list))
-                get-addr (fn [s] (-> s :addressable vals filter-by-name first))
-                e {:created    0
+          (let [e {:created    0
                    :id         tempid
                    :modified   0
                    :name       name
                    :parameters parameters
                    :origin     0
-                   :schedule   schedule-name
-                   :service    service-name
+                   :interval   schedule-name
+                   :target     target
+                   :protocol   protocol
+                   :httpMethod (co/conv-http-method httpMethod)
+                   :address    address
+                   :port       port
+                   :path       path
+                   :publisher  publisher
+                   :topic      topic
+                   :user       user
+                   :password   password
                    :type       :schedule-event}]
-            (swap! state (fn [s] (let [se (assoc e :addressable (get-addr s))
-                                       add-ref #(conj % [:schedule-event tempid])]
+            (swap! state (fn [s] (let [add-ref #(conj % [:schedule-event tempid])]
                                    (-> s
-                                       (assoc-in [:schedule-event tempid] se)
+                                       (assoc-in [:schedule-event tempid] e)
                                        (update-in [:show-schedule-events :singleton :content] add-ref)))))))
   (remote [env] true))
 
 (defmutation add-schedule
-  [{:keys [tempid name start end frequency run-once]}]
+  [{:keys [tempid name start end frequency cron run-once]}]
   (action [{:keys [state]}]
           (let [sc {:created    0
                     :cron       nil

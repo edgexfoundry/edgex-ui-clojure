@@ -31,3 +31,8 @@
   Protocol = "http"
   Host = "localhost"
   Port = 48060
+
+  [Clients.Scheduler]
+  Protocol = "http"
+  Host = "localhost"
+  Port = 48085

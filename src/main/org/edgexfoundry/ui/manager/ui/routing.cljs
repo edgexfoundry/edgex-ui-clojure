@@ -10,7 +10,8 @@
     [sibiro.core :as sibiro]
     [fulcro.client.primitives :as prim]
     [fulcro.client.logging :as log]
-    [org.edgexfoundry.ui.manager.ui.common :as co]))
+    [org.edgexfoundry.ui.manager.ui.common :as co]
+    [goog.net.cookies :as cks]))
 
 (def app-routing-tree
   (r/routing-tree
@@ -62,7 +63,7 @@
    [:get "/reading" :reading]
    [:get "/profile" :profile]
    [:get "/schedule" :schedule]
-   [:get "/schedule-event" :schedule-event]
+   [:get "/schedule-event/:id{[0-9a-f-]+}" :schedule-event]
    [:get "/schedule-event-info/:id{[0-9a-f-]+}" :schedule-event-info]
    [:get "/profile-yaml" :profile-yaml]
    [:get "/addressable" :addressable]
@@ -89,6 +90,11 @@
       state-map)
     (r/update-routing-links state-map sibiro-match)))
 
+(defn is-logged-in?
+  []
+  (let [cookie (cks/get "EDGEX_SESSION_ID")]
+    cookie))
+
 (defn set-route!*
   "Implementation of choosing a particular sibiro match. Used internally by the HTML5 history event implementation.
   Updates the UI only, unless the URI is invalid, in which case it redirects the UI and possibly generates new HTML5
@@ -98,9 +104,9 @@
         sm {:handler handler :route-params rp}]
     (cond
       (or (= :login handler)) (r/update-routing-links state-map sibiro-match)
-      (not (:logged-in? state-map)) (-> state-map
-                                        (assoc :loaded-uri (when @history (pushy/get-token @history)))
-                                        (redirect* {:handler :login}))
+      (not (is-logged-in?)) (-> state-map
+                                (assoc :loaded-uri (when @history (pushy/get-token @history)))
+                                (redirect* {:handler :login}))
       (invalid-route? handler) (redirect* state-map {:handler :main})
       :else (-> state-map
                 (r/update-routing-links sm)
@@ -116,6 +122,16 @@
 
 (defn key-to-string [k]
   (subs (str k) 1))
+
+(defn load-route-data [comp page route-params]
+   (condp = page
+     :control (let [id (-> route-params :id keyword)]
+                (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.devices/load-commands {:id ~id})]))
+     :schedule-event (let [id (-> route-params :id keyword)]
+                       (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.schedules/load-schedules {:id ~id})]))
+     :export (let [id (-> route-params :id keyword)]
+                       (prim/transact! comp `[(org.edgexfoundry.ui.manager.ui.exports/load-exports {:id ~id})]))
+     page))
 
 (defn nav-to!
   "Run a navigation mutation from the UI, but make sure that HTML5 routing is correctly honored so the components can be
@@ -134,10 +150,13 @@
 
 (defn start-routing [app-root]
   (when (and @use-html5-routing (not @history))
-    (let [; NOTE: the :pages follow-on read, so the whole UI updates when page changes
+    (let [; NOTE: the :device-page follow-on read, so the whole UI updates when page changes
           set-route! (fn [match]
                        ; Delay. history events should happen after a tx is processed, but a set token could happen during.
                        ; Time doesn't matter. This thread has to let go of the CPU before timeouts can process.
-                       (js/setTimeout #(prim/transact! app-root `[(set-route! ~match) :top-router]) 10))]
+                       (js/setTimeout (fn []
+                                        (let [{:keys [handler route-params]} match]
+                                          (load-route-data app-root handler route-params)
+                                          (prim/transact! app-root `[(set-route! ~match) :top-router]))) 10))]
       (reset! history (pushy/pushy set-route! match-uri))
-         (pushy/start! @history))))
+      (pushy/start! @history))))

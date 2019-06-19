@@ -22,6 +22,7 @@ func InitEndpoints(config *Config) {
 	endpoints[ClientLogging] = config.Clients["Logging"].Endpoint()
 	endpoints[ClientExport] = config.Clients["Export"].Endpoint()
 	endpoints[ClientNotifications] = config.Clients["Notifications"].Endpoint()
+	endpoints[ClientScheduler] = config.Clients["Scheduler"].Endpoint()
 }
 
 func SaveEndpoints(args map[interface{}]interface{}) (interface{}, error) {
@@ -31,6 +32,7 @@ func SaveEndpoints(args map[interface{}]interface{}) (interface{}, error) {
 	endpoints[ClientLogging] = args[transit.Keyword(ClientLogging)]
 	endpoints[ClientExport] = args[transit.Keyword(ClientExport)]
 	endpoints[ClientNotifications] = args[transit.Keyword(ClientNotifications)]
+	endpoints[ClientScheduler] = args[transit.Keyword(ClientScheduler)]
 	return nil, nil
 }
 
