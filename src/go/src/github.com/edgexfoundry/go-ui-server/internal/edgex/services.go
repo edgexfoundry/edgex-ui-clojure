@@ -351,17 +351,24 @@ func getReadingsInTimeRange(name string, from int64, to int64) (interface{}, err
 			if reading["device"].(string) != name {
 				continue
 			}
-			//check floatEncoding
-			valueDesName := reading["name"].(string)
-			resp, err := resty.R().Get(getEndpoint(ClientData) + "valuedescriptor/name/" + valueDesName)
-			var valueDesData map[string]interface{}
-			json.Unmarshal(resp.Body(), &valueDesData)
-			if err == nil && valueDesData["floatEncoding"] != nil && valueDesData["floatEncoding"].(string) == "Base64"{
-				float32_value := reading["value"].(string)
-				decodeValue, _ := base64.StdEncoding.DecodeString(float32_value)
-				bits := binary.LittleEndian.Uint32(decodeValue)
-				reading["value"] = math.Float32frombits(bits)
+
+			// check float32/float64 base64 encoding, should be a 8 or 12 chars long string
+			valueStr := reading["value"].(string)
+			valueLen := len(valueStr)
+			if (valueLen == 8 || valueLen == 12) && strings.HasSuffix(valueStr, "=") {
+				base64string := valueStr
+				decodeValue, _ := base64.StdEncoding.DecodeString(base64string)
+				if valueLen == 8 {
+					// handle float32 bits
+					bits := binary.LittleEndian.Uint32(decodeValue)
+					reading["value"] = math.Float32frombits(bits)
+				} else {
+					// handle float64 bits
+					bits := binary.LittleEndian.Uint64(decodeValue)
+					reading["value"] = math.Float64frombits(bits)
+				}
 			}
+
 			id := reading["id"].(string)
 			if !ids[id] {
 				ids[id] = true
