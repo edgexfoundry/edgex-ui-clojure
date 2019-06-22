@@ -149,16 +149,22 @@ $ cd src/go
 $ export GOPATH=$PWD
 $ cd src/github.com/edgexfoundry/go-ui-server/
 ```
+
 #### Install the Go packages
+
 ```
 $ go get
 ```
+
 #### Make soft link and start the web server
-```
+
+```bash
 $ ln -s ../../../../../../resources/public/ assets; ln -s ../../../../res/
 $ go run main.go
 ```
+
 #### Log in
+
 Navigate to http://localhost:3001 to login.
 The default password is `admin`.
 User can change the password by clicking the `Change password` link.
