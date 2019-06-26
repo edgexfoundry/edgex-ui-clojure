@@ -28,24 +28,43 @@ pipeline {
         stage('LF Prep') {
             steps {
                 edgeXSetupEnvironment()
-                edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
                 edgeXSemver 'init'
                 script {
                     def semverVersion = edgeXSemver()
                     env.setProperty('VERSION', semverVersion)
-                    sh 'echo $VERSION > VERSION'}
+                    sh 'echo $VERSION > VERSION'
+                }
             }
         }
 
-        stage('Build Docker') {
+        stage('Build Docker Image') {
             parallel {
                 stage('amd64') {
                     agent {
                         label 'centos7-docker-4c-2g'
                     }
-                    steps {
-                        script {
-                            image_amd64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                    stages {
+                        stage('Docker Build') {
+                            steps {
+                                edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
+
+                                script {
+                                    image_amd64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                                }
+                            }
+                        }
+
+                        stage('Docker Push') {
+                            when { expression { edgex.isReleaseStream() } }
+                            steps {
+                                script {
+                                    docker.withRegistry("https://${env.DOCKER_REGISTRY}:10004") {
+                                        image_amd64.push("amd64")
+                                        image_amd64.push(env.GIT_COMMIT)
+                                        image_amd64.push(env.VERSION)
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -54,9 +73,28 @@ pipeline {
                     agent {
                         label 'ubuntu18.04-docker-arm64-4c-2g'
                     }
-                    steps {
-                        script {
-                            image_arm64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                    stages {
+                        stage('Docker Build') {
+                            steps {
+                                edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
+
+                                script {
+                                    image_arm64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                                }
+                            }
+                        }
+
+                        stage('Docker Push') {
+                            when { expression { edgex.isReleaseStream() } }
+                            steps {
+                                script {
+                                    docker.withRegistry("https://${env.DOCKER_REGISTRY}:10004") {
+                                        image_arm64.push("arm64")
+                                        image_arm64.push("${env.GIT_COMMIT}-arm64")
+                                        image_arm64.push("${env.VERSION}-arm64")
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -73,24 +111,6 @@ pipeline {
             }
         }
 
-        stage('Docker Push') {
-            when { expression { edgex.isReleaseStream() } }
-            steps {
-                script {
-                    docker.withRegistry("https://${env.DOCKER_REGISTRY}:10004") {
-                        //amd64
-                        image_amd64.push("amd64")
-                        image_amd64.push(env.GIT_COMMIT)
-                        image_amd64.push(env.VERSION)
-                        //arm64
-                        image_arm64.push("arm64")
-                        image_arm64.push("${env.GIT_COMMIT}-arm64")
-                        image_arm64.push("${env.VERSION}-arm64")
-                    }
-                }
-            }
-        }
-        
         stage('SemVer Bump') {
             when { expression { edgex.isReleaseStream() } }
             steps {
@@ -98,7 +118,6 @@ pipeline {
                 edgeXSemver('push')
             }
         }
-
     }
 
     post {
