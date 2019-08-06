@@ -598,12 +598,6 @@ func ShowDevices(params []interface{}, args map[interface{}]interface{}) (interf
 		result["services"], err = getDeviceServices()
 	}
 	if err == nil {
-		result["schedules"], err = getSchedules()
-	}
-	if err == nil {
-		result["addressables"], err = getAddressables()
-	}
-	if err == nil {
 		result["profiles"], err = getProfiles()
 	}
 	return fulcro.Keywordize(result, err)
@@ -771,62 +765,22 @@ func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 	profileName := fulcro.GetString(args, "profile-name")
 	serviceName := fulcro.GetString(args, "service-name")
 	protocols := fulcro.GetPrtsMap(args, "protocols")
-	addressableName := name + "-addr"
 	device := Device{Name: name,
 		Description:    description,
 		Labels:         labels,
 		Profile:        Named{Name: profileName},
 		Service:        Named{Name: serviceName},
-		Addressable:    Named{Name: addressableName},
 		AdminState:     "UNLOCKED",
 		OperatingState: "ENABLED",
 		Protocols:       protocols,
 	}
-	address := fulcro.GetString(args, "address")
-	protocol := fulcro.GetString(args, "protocol")
-	port := fulcro.GetInt(args, "port")
-	path := fulcro.GetString(args, "path")
-	method := strings.ToUpper(string(fulcro.GetKeyword(args, "method")))
-	publisher := fulcro.GetString(args, "publisher")
-	topic := fulcro.GetString(args, "topic")
-	user := fulcro.GetString(args, "user")
-	password := fulcro.GetString(args, "password")
-	addressable := Addressable{
-		Id:        "",
-		Name:      addressableName,
-		Address:   address,
-		Protocol:  protocol,
-		Port:      port,
-		Path:      path,
-		Method:    method,
-		Publisher: publisher,
-		Topic:     topic,
-		User:      user,
-		Password:  password,
-		Cert:      "",
-		Key:       "",
-	}
-	_, err := resty.R().SetBody(addressable).Post(getEndpoint(ClientMetadata) + "addressable")
-	if err == nil {
-		_, err = resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
-	}
+	_, err := resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
 	return nil, err
 }
 
 func DeleteDevice(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
-	resp, err := resty.R().Get(getEndpoint(ClientMetadata) + "device/" + string(id))
-	if err == nil {
-		var data map[string]interface{}
-		json.Unmarshal(resp.Body(), &data)
-		service := data["service"].(map[string]interface{})
-		addressable := service["addressable"].(map[string]interface{})
-		addressableId := addressable["id"].(string)
-		_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "device/id/" + string(id))
-		if err == nil {
-			_, err = resty.R().Delete(getEndpoint(ClientMetadata) + "addressable/id/" + addressableId)
-		}
-	}
+	_, err := resty.R().Delete(getEndpoint(ClientMetadata) + "device/id/" + string(id))
 	return id, err
 }
 
