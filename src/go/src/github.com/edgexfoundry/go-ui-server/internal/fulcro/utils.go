@@ -160,6 +160,28 @@ func GetStringSeq(args map[interface{}]interface{}, id string) []string {
 	return result
 }
 
+func GetMapStringSeq(args map[interface{}]interface{}, id string) []map[string]interface{} {
+	seq := args[transit.Keyword(id)].([]interface{})
+	var result []map[string]interface{}
+	for _, v := range seq {
+		inner_result := v.(map[interface{}]interface{})
+		child_node := make(map[string]interface{})
+		for j, w := range inner_result {
+			key := string(j.(transit.Keyword))
+			switch w.(type) {
+			case bool:
+				child_node[key] = w
+			case string:
+				child_node[key] = w.(string)
+			case int:
+				child_node[key] = w.(int)
+			}
+		}
+		result = append(result, child_node)
+	}
+	return result
+}
+
 func MkTempIdResult(tempid transit.TaggedValue, resp *resty.Response) interface{} {
 	result := make(map[interface{}]interface{})
 	tempMap := transit.NewCMap()
