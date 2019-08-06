@@ -9,6 +9,19 @@
   font-size: 14px;
 }
 
+.radio-btn-row {
+  margin-left: -30px;
+}
+
+.inner-radio-btn-row {
+  margin-left: -15px;
+}
+
+.radio-btn-row .control-label, .inner-radio-btn-row .control-label {
+  color: #888888;
+  font-weight: 400;
+}
+
 .form-group .btn-group, .form-group .dropdown-menu {
   width: 100%;
 }
