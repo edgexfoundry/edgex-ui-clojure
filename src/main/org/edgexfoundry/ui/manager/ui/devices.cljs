@@ -24,7 +24,8 @@
             [org.edgexfoundry.ui.manager.ui.file-upload :as fu]
             [clojure.set :as set]
             [clojure.string :as str]
-            [clojure.spec.alpha :as s]))
+            [clojure.spec.alpha :as s]
+            ["rc-switch" :as ToggleWidget]))
 
 (defn set-admin-mode-target-device*
   [state id]
@@ -67,6 +68,12 @@
       (assoc-in [:protocols :singleton :ui/prt-name] "")
       (assoc-in [:protocols :singleton :ui/prt-value] "")))
 
+(defn set-autoEvents* [state]
+  (-> state
+      (assoc-in [::auto-events :singleton :ui/autoevents] [])
+      (assoc-in [::auto-events :singleton :ui/frequency] "")
+      (assoc-in [::auto-events :singleton :ui/resource] "")))
+
 (defmutation prepare-update-lock-mode
   [{:keys [id]}]
   (action [{:keys [state]}]
@@ -83,6 +90,7 @@
                                      (set-profiles*)
                                      (set-services*)
                                      (set-protocols*)
+                                     (set-autoEvents*)
                                      (fs/add-form-config* NewDeviceModal ref)
                                      (fs/mark-complete* ref)))))))
 
@@ -211,6 +219,34 @@
              (dom/td nil (second first-prop)))
      (mapv gen-protocol-prop (rest protocol-props))]))
 
+(defn auto-events-sub-table [autoEvents]
+  (let [gen-frequency-row (fn [autoEvent]
+                              (dom/div {:className "row eventrow"}
+                                       (dom/div {:className "col-md-12"} (:frequency autoEvent))))
+        gen-onchange-row (fn [autoEvent]
+                            (dom/div {:className "row eventrow"}
+                                     (dom/div {:className "col-md-12"} (if (:onChange autoEvent) "true" "false"))))
+        gen-resource-row (fn [autoEvent]
+                           (dom/div {:className "row eventrow"}
+                                    (dom/div {:className "col-md-12"} (:resource autoEvent))))]
+          (dom/div {:className "container-fluid"}
+                   (dom/div {:className "row"}
+                            (dom/div {:className "col-md-3 event-subject"}
+                                     (dom/div {:className "row event-title"}
+                                              (dom/div {:className "col-md-12"} (tr "Auto Events"))))
+                            (dom/div {:className "col-md-3 event-col"}
+                                     (dom/div {:className "row eventrow event-title"}
+                                              (dom/div {:className "col-md-12"} (tr "Frequency")))
+                                     (mapv #(gen-frequency-row %) autoEvents))
+                            (dom/div {:className "col-md-2 event-col"}
+                                     (dom/div {:className "row eventrow event-title"}
+                                              (dom/div {:className "col-md-12"} (tr "On Change")))
+                                     (mapv #(gen-onchange-row %) autoEvents))
+                            (dom/div {:className "col-md-3 event-col last-col"}
+                                     (dom/div {:className "row eventrow event-title"}
+                                              (dom/div {:className "col-md-12"} (tr "Resource")))
+                                     (mapv #(gen-resource-row %) autoEvents))))))
+
 (defn device-general-table [id name description profile protocols labels]
   (let [labels-str (str/join ", " (map #(str "'" % "'" ) labels))]
     (dom/div {:className "table-responsive"}
@@ -236,10 +272,10 @@
 
 (defsc DeviceInfo [this
                    {:keys [id type name description profile labels adminState operatingState lastConnected lastReported
-                           protocols service]}]
+                           protocols service autoEvents]}]
   {:ident [:device :id]
    :query [:id :type :name :description :profile :labels :adminState :operatingState :lastConnected :lastReported
-           :protocols :service]}
+           :protocols :service :autoEvents]}
   (let [admin-str (if (= adminState :LOCKED)
                     "Locked"
                     "Unlocked")
@@ -265,7 +301,8 @@
                                           (dom/i {:className "glyphicon fa fa-caret-square-o-left"}))))
                       (dom/div {:className "header"}
                                (dom/h4 {:className "title"} "Device"))
-                      (device-general-table id name description profile protocols labels))
+                      (device-general-table id name description profile protocols labels)
+                      (auto-events-sub-table autoEvents))
              (dom/div {:className "card"}
                       (dom/div {:className "header"}
                                (dom/h4 {:className "title"} "Status"))
@@ -459,6 +496,8 @@
    :topic topic})
 
 (def ui-opcua-device-entry (prim/factory OPCUADeviceEntry))
+
+(def ui-toggle (co/factory-apply ToggleWidget/default))
 
 (defsc BACnetIPDeviceEntry [this {:keys [device/address device/port]}]
   {:query [:device/address :device/port fs/form-config-join]
@@ -711,8 +750,59 @@
 
 (def ui-prt-table (prim/factory ProtocolTable))
 
+(defsc AutoEventTable [this {:keys [ui/frequency ui/onchange ui/resource ui/autoevents]}]
+  {:initial-state (fn [p] {:ui/frequency "" :ui/onchange true :ui/resource "" :ui/autoevents []})
+   :query [:ui/frequency :ui/onchange :ui/resource :ui/autoevents]
+   :ident (fn [] [::auto-events :singleton])}
+  (let [add-prt-prop (fn [] (let [events (conj autoevents {:temp-id (str (random-uuid)) :frequency frequency :onChange onchange :resource resource})]
+                              (m/set-value! this :ui/autoevents events)
+                              (m/set-value! this :ui/frequency "")
+                              (m/set-value! this :ui/resource "")))
+        display-item (fn [[k v]]
+                       (when (not= k :temp-id)
+                         (condp = v
+                           true  (dom/div {:key k :className "toggle"} "true")
+                           false (dom/div {:key k :className "toggle"} "false")
+                           (dom/div {:key k :className "item"} v))))
+        delete-event (fn [event]
+                       (let [new-events  (filterv #(not= (:temp-id %) (:temp-id event)) autoevents)]
+                         (m/set-value! this :ui/autoevents new-events)))
+        mk-auto-event-item (fn [event]
+                             (dom/div {:className "autoevent-container event-row" :key (:temp-id event)}
+                                      (map #(display-item %) event)
+                                      (dom/div {:key "close-btn" :className "close"}
+                                               (dom/span {:className "fa fa-close"  :onClick #(delete-event event)}))))]
+    (dom/div {:className "form-group"}
+             (dom/div {:className "prts"}
+                      (dom/h5 "Auto Events")
+
+             (dom/div {:className "autoevent-container auto-header"}
+                      (dom/div {:className "item"} (tr "Frequency"))
+                      (dom/div {:className "toggle"} (tr "On Change"))
+                      (dom/div {:className "item"} (tr "Resource"))
+                      (dom/div nil ""))
+             (mapv #(mk-auto-event-item %) autoevents)
+             (dom/div {:className "autoevent-container footer"}
+                      (dom/div {:className "item"}
+                               (b/labeled-input {:id        "frequency" :value frequency :type "text" :split 0 :placeholder "Type frequency"
+                                                 :onKeyDown (fn [evt] (when (evt/enter-key? evt) #(add-prt-prop)))
+                                                 :onChange  #(m/set-string! this :ui/frequency :event %)} ""))
+                      (dom/div {:className "toggle"}
+
+                                                (ui-toggle {:checked onchange :onChange (fn [v] (m/set-value! this :ui/onchange v))}))
+
+                      (dom/div {:className "item"}
+                               (b/labeled-input {:id "resource" :value resource  :type "text" :split 0 :placeholder ""
+                                                 :onKeyDown (fn [evt] (when (evt/enter-key? evt) #(add-prt-prop)))
+                                                 :onChange #(m/set-string! this :ui/resource :event %)} ""))
+
+                      (dom/div nil (b/button {:key     "back-button" :className "btn-fill" :kind :info
+                                 :onClick add-prt-prop} (tr "Add"))))))))
+
+(def ui-autoevent-table (prim/factory AutoEventTable))
+
 (defsc DeviceEntry [this {:keys [device/name device/description device/labels device/service device/profile
-                                 new-device devices profiles services ui/dropdown ui/dropdown2 device-type profile-file device/protocols]}]
+                                 new-device devices profiles services ui/dropdown ui/dropdown2 device-type profile-file device/protocols device/auto-events]}]
   {:query [:device/name :device/description :device/labels :device/profile :device/service fs/form-config-join :device-type
            {:new-device (prim/get-query DeviceTypeEntry)}
            {:devices (prim/get-query DeviceNames)}
@@ -721,13 +811,15 @@
            {:ui/dropdown (prim/get-query b/Dropdown)}
            {:ui/dropdown2 (prim/get-query b/Dropdown)}
            {:profile-file (prim/get-query FileUpload)}
-           {:device/protocols (prim/get-query ProtocolTable)}]
+           {:device/protocols (prim/get-query ProtocolTable)}
+           {:device/auto-events (prim/get-query AutoEventTable)}]
    :initial-state (fn [p] {:device/name  "" :device/description "" :device/labels []
                            :new-device (prim/get-initial-state DeviceTypeEntry {})
                            :ui/dropdown (prim/get-initial-state b/Dropdown {})
                            :ui/dropdown2 (prim/get-initial-state b/Dropdown {})
                            :profile-file (prim/get-initial-state FileUpload {:upload-id 0})
-                           :device/protocols (prim/get-initial-state ProtocolTable {})})
+                           :device/protocols (prim/get-initial-state ProtocolTable {})
+                           :device/auto-events (prim/get-initial-state AutoEventTable {})})
    :form-fields #{:device/name :device/description :device/labels :device/profile :device/service :new-device}
    :ident (fn [] co/new-device-entry)}
   (let [existing-name? (some #(= (:name %) name) devices)
@@ -785,11 +877,12 @@
                                                                                (m/set-value! this :device/service v)
                                                                                (prim/transact! this `[(fs/mark-complete!
                                                                                                         {:field :device/service})
-                                                                                                      :new-device2])))))))))))
+                                                                                                      :new-device2])))))
+                                             (ui-autoevent-table auto-events)))))))
 
 (def ui-device-entry (prim/factory DeviceEntry))
 
-(defn device-data [device-type name description labels new-device profile-name service-name protocols]
+(defn device-data [device-type name description labels new-device profile-name service-name protocols auto-events]
   (let [device {:name name
                 :description description
                 :labels labels
@@ -809,18 +902,21 @@
     (-> device
         (merge extra-data)
         (merge protocols)
+        (merge auto-events)
         set-defaults
         set-port
         set-method)))
 
 (defn add-new-device [comp {:keys [device-entry device-type-selection] :as props}]
   (let [device-type (:ui/device-type device-type-selection)
-        {:keys [device/name device/description device/labels device/profile device/service new-device profiles services device/protocols]} device-entry
+        {:keys [device/name device/description device/labels device/profile device/service new-device profiles services device/protocols device/auto-events]} device-entry
         profile-name (-> (filter #(= profile (:id %)) profiles) first :name)
         service-name (-> (filter #(= service (:id %)) services) first :name)
         {:keys [ui/prts prt-props]} protocols
         final-prt (if (= device-type ::modbus) nil {:protocols {prts prt-props}})
-        device (device-data device-type name description labels new-device profile-name service-name final-prt)]
+        {:keys [ui/autoevents]} auto-events
+        final-autoevents {:autoEvents (mapv #(select-keys % [:frequency :onChange :resource]) autoevents)}
+        device (device-data device-type name description labels new-device profile-name service-name final-prt final-autoevents)]
     (prim/transact! comp `[(mu/add-device ~device)
                            (fs/reset-form!)
                            (b/hide-modal {:id :add-device-modal})
