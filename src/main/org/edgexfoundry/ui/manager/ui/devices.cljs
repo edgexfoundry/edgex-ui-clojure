@@ -349,11 +349,11 @@
 
 (defsc DeviceType [this {:keys [:ui/device-type]}]
   {:query [:ui/device-type fs/form-config-join]
-   :initial-state (fn [p] {:ui/device-type ::other})
+   :initial-state (fn [p] {:ui/device-type ::modbus})
    :form-fields #{:ui/device-type}
    :ident (fn [] [:device-type-subform :singleton])}
-  (let [options [[::modbus "Modbus"] [::opc-ua "OPC-UA"] [::bacnet-ip "BACnet/IP"] [::bacnet-mstp "BACnet/MSTP"]; [::mqtt "MQTT"]
-                 [::other"Other"]]
+  (let [options [[::modbus "Modbus"] [::other "Generic"]]    ;[::opc-ua "OPC-UA"] [::bacnet-ip "BACnet/IP"] [::bacnet-mstp "BACnet/MSTP"]; [::mqtt "MQTT"]
+                                                             ; remove the other protocols as the devices services are not supported yet
         gen-opt #(mk-radio-option this "device-type" device-type :ui/device-type (first %) (second %))]
     (dom/div :.form-horizontal
              (dom/fieldset nil
@@ -386,10 +386,12 @@
         baud-rates ["1200" "2400" "4800" "9600" "19200" "38400" "57600" "115200"]
         baud-opts (mapv gen-baud-opt baud-rates)]
     (dom/div :.form-group
-             (dom/label :.control-label.col-sm-4 "Modbus Type:")
-             (dom/div :.col-sm-8
-                      (gen-protocol-opt "TCP")
-                      (gen-protocol-opt "RTU"))
+             (dom/div :.radio-btn-row
+                      (dom/div :.col-sm-4
+                               (dom/label :.control-label"Modbus Type:"))
+                      (dom/div :.col-sm-8
+                               (gen-protocol-opt "TCP")
+                               (gen-protocol-opt "RTU")))
              (if (= protocol "TCP")
                (dom/div nil
                         (input-with-label this :device/address "Host:" "" "DNS name or IP address" nil)
@@ -397,17 +399,23 @@
                (dom/div nil
                         (input-with-label this :modbus-device/serial-device "Serial Device:" "Invalid" "/dev/..." nil)
                         (dom/div :.form-group
-                                 (dom/label :.col-sm-4.control-label "Baud rate:")
-                                 (dom/div :.col-sm-8 baud-opts)
-                                 (dom/label :.col-sm-4.control-label "Parity:")
-                                 (dom/div :.col-sm-8
-                                          (gen-parity-opt "None" "N")
-                                          (gen-parity-opt "Even" "E")
-                                          (gen-parity-opt "Odd" "O"))
-                                 (dom/label :.col-sm-4.control-label "Stop bits:")
-                                 (dom/div :.col-sm-8
-                                          (gen-stop-bits-opt "1")
-                                          (gen-stop-bits-opt "2")))))
+                                 (dom/div :.inner-radio-btn-row
+                                          (dom/div :.col-sm-4
+                                                   (dom/label :.control-label "Baud rate:"))
+                                          (dom/div :.col-sm-8 baud-opts))
+                                 (dom/div :.inner-radio-btn-row
+                                          (dom/div :.col-sm-4
+                                                   (dom/label :.control-label "Parity:"))
+                                          (dom/div :.col-sm-8
+                                                   (gen-parity-opt "None" "N")
+                                                   (gen-parity-opt "Even" "E")
+                                                   (gen-parity-opt "Odd" "O")))
+                                 (dom/div :.inner-radio-btn-row
+                                          (dom/div :.col-sm-4
+                                                   (dom/label :.control-label "Stop bits:"))
+                                          (dom/div :.col-sm-8
+                                                   (gen-stop-bits-opt "1")
+                                                   (gen-stop-bits-opt "2"))))))
              (input-with-label this :modbus-device/unit-id "Unit Identifier:" "Invalid" "0 - 255" nil))))
 
 (def ui-modbus-device-entry (prim/factory ModbusDeviceEntry))
@@ -423,7 +431,7 @@
                 :DataBits "8"
                 :StopBits stop-bits
                 :Parity parity})
-        protocol-key (if (= protocol "TCP") :ProtocolTCP :ProtocolRTU)]
+        protocol-key (if (= protocol "TCP") :modbus-tcp :modbus-rtu)]
     {:protocols {protocol-key (merge base info)}}))
 
 (defsc OPCUADeviceEntry [this {:keys [device/address device/port device/path device/topic]}]
@@ -498,9 +506,10 @@
              (input-with-label this :device/address "Host:" "" "DNS name or IP address" nil)
              (input-with-label this :device/port "Port:" "Invalid port number" "Port number (1 - 65535)" nil)
              (input-with-label this :device/path "Path:" "" "Path" nil)
-             (dom/div :.form-group
-                      (dom/label :.col-sm-3.control-label "Method:")
-                      (dom/div :.col-sm-9 (mapv gen-method methods)))
+             (dom/div :.radio-btn-row
+                      (dom/div :.col-sm-4
+                               (dom/label :.control-label "Method:"))
+                      (dom/div :.col-sm-8 (mapv gen-method methods)))
              (input-with-label this :device/publisher "Publisher:" "" "" nil)
              (input-with-label this :device/topic "Topic:" "" "" nil)
              (input-with-label this :device/user "User:" "" "" nil)
