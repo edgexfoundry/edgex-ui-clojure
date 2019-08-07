@@ -313,3 +313,9 @@
 
 (defmutation save-endpoints [{:keys [metadata data command logging notifications export]}]
   (remote [env] true))
+
+(defmutation closeMenuPopup
+  [noargs]
+  (action [{:keys [component state]}]
+          (swap! state (fn [s] (-> s
+                                   (assoc-in [:org.edgexfoundry.ui.manager.ui.root/nav-bar :singleton :nav-bar/menu-open?] false))))))

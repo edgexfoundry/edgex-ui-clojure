@@ -57,3 +57,17 @@
   :schedule-event sc/ScheduleEventInfo)
 
 (def ui-device-list-or-info (prim/factory DeviceListOrInfoRouter))
+
+(defn select-active-menu [props]
+  (condp #(contains? %2 %1) props
+    :ui/show-devices :device
+    :ui/reading-list :reading
+    :ui/show-profiles :profile
+    :ui/show-addressables :addressable
+    :ui/show-schedules :schedule
+    :ui/show-logs :log
+    :ui/show-notifications :notification
+    :ui/show-subscriptions :subscription
+    :ui/show-transmissions :transmission
+    :ui/show-exports :export
+    nil))

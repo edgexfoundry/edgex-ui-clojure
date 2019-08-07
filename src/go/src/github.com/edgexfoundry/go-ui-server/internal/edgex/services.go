@@ -756,6 +756,7 @@ type Device struct {
 	AdminState     string   `json:"adminState"`
 	OperatingState string   `json:"operatingState"`
 	Protocols      map[string]interface{} `json:"protocols"`
+	AutoEvents     []map[string]interface{} `json:"autoEvents"`
 }
 
 func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
@@ -765,6 +766,7 @@ func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 	profileName := fulcro.GetString(args, "profile-name")
 	serviceName := fulcro.GetString(args, "service-name")
 	protocols := fulcro.GetPrtsMap(args, "protocols")
+	auto_events := fulcro.GetMapStringSeq(args, "autoEvents")
 	device := Device{Name: name,
 		Description:    description,
 		Labels:         labels,
@@ -773,6 +775,7 @@ func AddDevice(args map[interface{}]interface{}) (interface{}, error) {
 		AdminState:     "UNLOCKED",
 		OperatingState: "ENABLED",
 		Protocols:       protocols,
+		AutoEvents:      auto_events,
 	}
 	_, err := resty.R().SetBody(device).Post(getEndpoint(ClientMetadata) + "device")
 	return nil, err

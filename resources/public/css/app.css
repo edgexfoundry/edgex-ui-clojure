@@ -318,3 +318,96 @@ ul.autocomplete .option-text {
   height: 20px;
   border-top: 1px solid rgba(86,61,124,.2);
 }
+
+/* device auto-events */
+.autoevent-container {
+  display: flex;
+  flex-flow: row nowrap;
+  color: #9A9A9A;
+}
+
+.autoevent-container.auto-header {
+  text-transform: uppercase;
+  font-size: 12px;
+}
+.autoevent-container .item {
+  width: 35%;
+}
+
+.autoevent-container .toggle {
+  width: 20%;
+}
+
+.autoevent-container .close {
+  width: 5%;
+}
+
+.autoevent-container input {
+  width: 80%;
+  height: 80%;
+  font-size: 12px;
+}
+
+.autoevent-container span.fa.fa-close {
+  font-size: 13px;
+}
+
+.autoevent-container.event-row {
+  border-top: solid 0.5px rgba(0,0,0,0.5);
+  align-items: center;
+  height: 40px;
+}
+
+.autoevent-container.footer {
+  border-top: solid 0.5px rgba(0,0,0,0.5);
+  height: 40px;
+  padding-top: 10px;
+}
+
+.autoevent-container.footer .col-sm-12 {
+    padding-left: 0;
+}
+
+.autoevent-container.footer .rc-switch, .autoevent-container.footer .form-group {
+  margin-left: 0;
+}
+
+.container-fluid .row.eventrow {
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+}
+
+.container-fluid .row.event-title {
+  min-height: 50px;
+  display: flex;
+  height: auto;
+  align-items: center;
+  font-weight: 800;
+  margin-left: -20px;
+}
+
+.container-fluid .event-col {
+  border-left: solid 0.5px #ddd;
+}
+
+.container-fluid .eventrow {
+    border-top: solid 0.5px #ddd;
+}
+
+.col-md-3.event-subject {
+  width: 26.45%;
+}
+
+.col-md-3.event-col.last-col {
+  width: 31.88%;
+}
+
+/* side bar menus */
+li.sub-menu {
+  padding-left: 15px;
+}
+
+li.sub-menu i:before {
+  vertical-align: middle;
+}
