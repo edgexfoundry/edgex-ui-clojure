@@ -402,3 +402,12 @@ ul.autocomplete .option-text {
 .col-md-3.event-col.last-col {
   width: 31.88%;
 }
+
+/* side bar menus */
+li.sub-menu {
+  padding-left: 15px;
+}
+
+li.sub-menu i:before {
+  vertical-align: middle;
+}
