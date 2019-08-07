@@ -100,7 +100,6 @@
                 (b/ui-modal-title nil
                                   (dom/div {:key "title" :style {:fontSize "22px"}} "Confirm Logout"))
                 (b/ui-modal-body nil
-                                 (dom/div {:className "swal2-icon swal2-warning" :style {:display "block"}} "!")
                                  (dom/p {:key "message" :className b/text-danger} (str "Are you sure to log out?")))
                 (b/ui-modal-footer nil
                                    (b/button {:key "ok-button" :className "btn-fill" :kind :info
