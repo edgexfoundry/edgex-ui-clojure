@@ -59,7 +59,7 @@
   [[:get "/login" :login]
    [:get "/" :main]
    [:get "/info/:id{[0-9a-f-]+}" :info]
-   [:get "/command" :control]
+   [:get "/command/:id{[0-9a-f-]+}" :control]
    [:get "/reading" :reading]
    [:get "/profile" :profile]
    [:get "/schedule" :schedule]
