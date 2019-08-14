@@ -411,3 +411,18 @@ li.sub-menu {
 li.sub-menu i:before {
   vertical-align: middle;
 }
+
+/* command modal */
+.command-modal .container{
+  width: 100%;
+}
+
+.command-modal h4{
+  margin: 10px;
+  padding-top: 10px;
+}
+
+.command-modal label {
+    text-transform: none!important;
+    font-size: 14px;
+}
