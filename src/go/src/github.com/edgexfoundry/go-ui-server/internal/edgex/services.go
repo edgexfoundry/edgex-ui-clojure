@@ -705,7 +705,8 @@ func getValueDescriptors() (interface{}, error) {
 func UpdateLockMode(args map[interface{}]interface{}) (interface{}, error) {
 	id := fulcro.GetKeyword(args, "id")
 	mode := fulcro.GetKeyword(args, "mode")
-	_, err := resty.R().Put(getEndpoint(ClientCommand) + "device/" + string(id) + "/adminstate/" + string(mode))
+	device := Device{AdminState: string(mode)}
+	_, err := resty.R().SetBody(device).Put(getEndpoint(ClientMetadata) + "device/" + string(id))
 	return id, err
 }
 
