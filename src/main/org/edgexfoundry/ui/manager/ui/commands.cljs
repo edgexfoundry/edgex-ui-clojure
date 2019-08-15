@@ -41,6 +41,18 @@
         invalid-number? (and number? (is-nan? value))]
     [selected (or (not selected) (and (not out-of-range?) (not invalid-number?)))]))
 
+(defn add-value-descriptor-refs* [state]
+  (let [vds (-> state :value-descriptor vals)
+        mkref (fn [v] [:value-descriptor (:id v)])
+        vd-refs (mapv #(vector :value-descriptor (:id %)) vds)
+        add-refs (fn [s id] (assoc-in s [:command id :value-descriptors] vd-refs))]
+    (reduce add-refs state (-> state :command keys))))
+
+(defmutation add-value-descriptor-refs [nokeys]
+  (action [{:keys [state]}]
+          (swap! state (fn [s] (-> s
+                                   add-value-descriptor-refs*)))))
+
 (defn validate-set-command* [state]
   (let [target (get-in state [:set-command-modal :singleton :target])
         cmd (get-in state target)
@@ -86,56 +98,56 @@
         out-of-range? (and have-max-min? (or (< (to-float value) (to-float min)) (> (to-float value) (to-float max))))
         invalid-number? (and number? (is-nan? value))
         validate #(prim/transact! this `[(validate-set-command {}) :set-command-modal])]
-    (dom/div #js {:className "form-group"}
-             (dom/input #js {:className "col-sm-1"
-                             :type "checkbox"
-                             :checked (or selected false)
-                             :onChange (fn [evt] (let [new-value (.. evt -target -checked)]
-                                                   (m/set-value! this :ui/selected new-value)
-                                                   (validate)))})
-             (dom/label #js {:className "col-sm-3 control-label"} name)
-             (dom/div #js {:className "col-sm-7"}
-                       (if (= value-type "B")
-                         (dom/div #js {:className "form-check form-check-radio"}
-                                  (dom/label nil
-                                             (dom/input #js
-                                                            {:className "form-check-input"
-                                                             :type "radio",
-                                                             :value "false"
-                                                             :checked (= (or value defaultValue) "false")
-                                                             :onChange (fn [evt]
-                                                                         (let [new-value (.. evt -target -value)]
-                                                                           (m/set-string! this :ui/value :value
-                                                                                          new-value)
-                                                                           (validate)))})
-                                             "OFF")
-                                  (dom/label nil
-                                             (dom/input #js
-                                                            {:className "form-check-input"
-                                                             :type "radio",
-                                                             :value "true"
-                                                             :checked (= (or value defaultValue) "true")
-                                                             :onChange (fn [evt]
-                                                                         (let [new-value (.. evt -target -value)]
-                                                                           (m/set-string! this :ui/value :value
-                                                                                          new-value)
-                                                                           (validate)))})
-                                             "ON"))
-                         (dom/div nil
-                                  (when have-max-min?
-                                    (dom/small #js {:className "form-text text-muted"} (str "min " min " max " max)))
-                                  (dom/input #js
-                                                 {:type "text",
-                                                  :className "form-control"
-                                                  :value (or value defaultValue)
-                                                  :onChange (fn [evt]
-                                                              (let [new-value (.. evt -target -value)]
-                                                                (m/set-string! this :ui/value :value new-value)
-                                                                (validate)))})
-                                  (when out-of-range?
-                                    (dom/label #js {:className b/text-danger} "Out of range"))
-                                  (when invalid-number?
-                                    (dom/label #js {:className b/text-danger} "Invalid"))))))))
+    (dom/div {:className "form-group"}
+             (dom/div {:className "row"}
+                      (dom/input {:className "col-sm-1"
+                                  :type      "checkbox"
+                                  :checked   (or selected false)
+                                  :onChange  (fn [evt] (let [new-value (.. evt -target -checked)]
+                                                         (m/set-value! this :ui/selected new-value)
+                                                         (validate)))})
+                      (dom/label {:className "col-sm-5 control-label"} name)
+                      (dom/div {:className "col-sm-5"}
+                               (if (= value-type "B")
+                                 (dom/div {:className "form-check form-check-radio"}
+                                          (dom/label nil
+                                                     (dom/input {:className "form-check-input"
+                                                                 :type      "radio",
+                                                                 :value     "false"
+                                                                 :checked   (= (or value defaultValue) "false")
+                                                                 :onChange  (fn [evt]
+                                                                              (let [new-value (.. evt -target -value)]
+                                                                                (m/set-string! this :ui/value :value
+                                                                                               new-value)
+                                                                                (validate)))})
+                                                     "OFF")
+                                          (dom/label nil
+                                                     (dom/input {:className "form-check-input"
+                                                                 :type      "radio",
+                                                                 :value     "true"
+                                                                 :checked   (= (or value defaultValue) "true")
+                                                                 :onChange  (fn [evt]
+                                                                              (let [new-value (.. evt -target -value)]
+                                                                                (m/set-string! this :ui/value :value
+                                                                                               new-value)
+                                                                                (validate)))})
+                                                     "ON"))
+                                 (dom/div nil
+                                          (when have-max-min?
+                                            (dom/small {:className "form-text text-muted"}
+                                                       (when-not (empty? min) (str "min " min))
+                                                       (when-not (empty? max) (str " max " max))))
+                                          (dom/input {:type      "text",
+                                                      :className "form-control"
+                                                      :value     (or value defaultValue)
+                                                      :onChange  (fn [evt]
+                                                                   (let [new-value (.. evt -target -value)]
+                                                                     (m/set-string! this :ui/value :value new-value)
+                                                                     (validate)))})
+                                          (when out-of-range?
+                                            (dom/label {:className b/text-danger} "Out of range"))
+                                          (when invalid-number?
+                                            (dom/label {:className b/text-danger} "Invalid")))))))))
 
 (def ui-command-put (prim/factory CommandPut {:keyfn id/edgex-ident}))
 
@@ -157,13 +169,13 @@
         url (-> target :put :url)]
     (b/ui-modal modal
                 (b/ui-modal-title nil
-                                  (dom/div #js {:key "title"
-                                                :style #js {:fontSize "22px"}} (str "Set " name)))
+                                  (dom/div {:key "title"
+                                            :style {:fontSize "22px"}} (str "Set " name)))
                 (b/ui-modal-body nil
-                                 (dom/div #js {:className "swal2-icon swal2-warning" :style #js {:display "block"}} "!")
-                                 (dom/div #js {:className "card"}
+                                 ;(dom/div {:className "swal2-icon swal2-warning" :style #js {:display "block"}} "!")
+                                 (dom/div {:className "command-modal card"}
                                           (dom/h4 nil name)
-                                          (dom/div #js {:className "form-horizontal"}
+                                          (dom/div #js {:className "container"}
                                                    (map ui-command-put params))))
                 (b/ui-modal-footer nil
                                    (b/button {:key       "ok-button"
