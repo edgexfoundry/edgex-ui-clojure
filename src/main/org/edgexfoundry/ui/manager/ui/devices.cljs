@@ -187,7 +187,7 @@
                                   (dom/div {:key "title"
                                             :style #js {:fontSize "22px"}} "Change Admin Status"))
                 (b/ui-modal-body nil
-                                 (dom/div {:className "swal2-icon swal2-warning" :style #js {:display "block"}} "!")
+                                 ;(dom/div {:className "swal2-icon swal2-warning" :style #js {:display "block"}} "!")
                                  (dom/p {:key "message" :className b/text-danger} (str mode-str " " name)))
                 (b/ui-modal-footer nil
                                    (b/button {:key "ok-button" :className "btn-fill" :kind :info
