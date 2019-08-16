@@ -63,10 +63,10 @@
 
 (defn set-protocols* [state]
   (-> state
-      (assoc-in [:protocols :singleton :prt-props] {})
-      (assoc-in [:protocols :singleton :ui/prts] "")
-      (assoc-in [:protocols :singleton :ui/prt-name] "")
-      (assoc-in [:protocols :singleton :ui/prt-value] "")))
+      (assoc-in [::protocols :singleton :prt-props] {})
+      (assoc-in [::protocols :singleton :ui/prts] "")
+      (assoc-in [::protocols :singleton :ui/prt-name] "")
+      (assoc-in [::protocols :singleton :ui/prt-value] "")))
 
 (defn set-autoEvents* [state]
   (-> state
@@ -529,43 +529,11 @@
   {:address address
    :path path})
 
-(defsc OtherDeviceEntry [this {:keys [device/protocol device/address device/port device/path device/publisher device/topic
-                                      device/user device/password device/method]}]
-  {:query [:device/protocol :device/address :device/port :device/path :device/publisher :device/topic :device/user :device/password
-           :device/method fs/form-config-join]
-   :initial-state (fn [p] {:device/protocol "" :device/address "" :device/port "1000" :device/path "" :device/publisher ""
-                           :device/topic "" :device/user "" :device/password "" :device/method :get})
-   :form-fields #{:device/protocol :device/address :device/port :device/path :device/publisher :device/topic :device/user
-                  :device/password :device/method}
-   :ident (fn [] [::other :singleton])}
-  (let [methods [[:get "GET"] [:post "POST"] [:put "PUT"] [:delete "DELETE"]]
-        gen-method #(mk-radio-option this "method" method :device/method (first %) (second %))]
-    (dom/div :.form-group
-             (input-with-label this :device/protocol "Protocol:" "" "Transport protocol" nil)
-             (input-with-label this :device/address "Host:" "" "DNS name or IP address" nil)
-             (input-with-label this :device/port "Port:" "Invalid port number" "Port number (1 - 65535)" nil)
-             (input-with-label this :device/path "Path:" "" "Path" nil)
-             (dom/div :.radio-btn-row
-                      (dom/div :.col-sm-4
-                               (dom/label :.control-label "Method:"))
-                      (dom/div :.col-sm-8 (mapv gen-method methods)))
-             (input-with-label this :device/publisher "Publisher:" "" "" nil)
-             (input-with-label this :device/topic "Topic:" "" "" nil)
-             (input-with-label this :device/user "User:" "" "" nil)
-             (input-with-label this :device/password "Password:" "" "" nil))))
+(declare ProtocolTable)
+(declare ui-prt-table)
 
-(defn other-info [{:keys [device/protocol device/address device/port device/path device/publisher device/topic
-                          device/user device/password]}]
-  {:device/protocol protocol
-   :device/address address
-   :device/port port
-   :device/path path
-   :device/publisher publisher
-   :device/topic topic
-   :device/user user
-   :device/password password})
-
-(def ui-other-device-entry (prim/factory OtherDeviceEntry))
+(defn other-info [{:keys [ui/prts prt-props]}]
+  {:protocols {prts prt-props}})
 
 (defsc DeviceTypeEntry [this {:keys [modbus opcua bacnet-ip bacnet-mstp other device-type]}]
   {:ident (fn [] [:device-type-entry :singleton])
@@ -573,13 +541,13 @@
            {:opcua (prim/get-query OPCUADeviceEntry)}
            {:bacnet-ip (prim/get-query BACnetIPDeviceEntry)}
            {:bacnet-mstp (prim/get-query BACnetMSTPDeviceEntry)}
-           {:other (prim/get-query OtherDeviceEntry)}
+           {:other (prim/get-query ProtocolTable)}
            fs/form-config-join :device-type]
    :initial-state (fn [p] {:modbus (prim/get-initial-state ModbusDeviceEntry {})
                            :opcua (prim/get-initial-state OPCUADeviceEntry {})
                            :bacnet-ip (prim/get-initial-state BACnetIPDeviceEntry {})
                            :bacnet-mstp (prim/get-initial-state BACnetMSTPDeviceEntry {})
-                           :other (prim/get-initial-state OtherDeviceEntry {})})
+                           :other (prim/get-initial-state ProtocolTable {})})
    :form-fields #{:modbus :opcua :bacnet-ip :bacnet-mstp :other}}
   (dom/div nil
            (case device-type
@@ -587,7 +555,7 @@
              ::opc-ua (ui-opcua-device-entry opcua)
              ::bacnet-ip (ui-bacnet-ip-device-entry bacnet-ip)
              ::bacnet-mstp (ui-bacnet-mstp-device-entry bacnet-mstp)
-             ::other (ui-other-device-entry other))))
+             ::other (ui-prt-table other))))
 
 (def ui-device-type-entry (prim/factory DeviceTypeEntry))
 
@@ -703,15 +671,16 @@
    :query [:id :type :name]})
 
 (defn mk-td-item [[k v]]
-  (dom/tr nil
+  (dom/tr {:key k}
           (dom/td (name k))
           (dom/td v)
           (dom/td "")))
 
 (defsc ProtocolTable [this {:keys [ui/prts ui/prt-name ui/prt-value prt-props]}]
   {:initial-state (fn [p] {:ui/prts "" :ui/prt-name "" :ui/prt-value "" :prt-props {}})
-   :query [:ui/prts :ui/prt-name :ui/prt-value :prt-props]
-   :ident (fn [] [:protocols :singleton])}
+   :query [:ui/prts :ui/prt-name :ui/prt-value :prt-props fs/form-config-join]
+   :form-fields #{:ui/prts :ui/prt-name :ui/prt-value :prt-props}
+   :ident (fn [] [::protocols :singleton])}
   (let [add-prt-prop (fn [] (let [new-props (conj prt-props {(keyword prt-name) prt-value})]
                               (m/set-value! this :prt-props new-props)
                               (m/set-value! this :ui/prt-name "")
@@ -802,7 +771,7 @@
 (def ui-autoevent-table (prim/factory AutoEventTable))
 
 (defsc DeviceEntry [this {:keys [device/name device/description device/labels device/service device/profile
-                                 new-device devices profiles services ui/dropdown ui/dropdown2 device-type profile-file device/protocols device/auto-events]}]
+                                 new-device devices profiles services ui/dropdown ui/dropdown2 device-type profile-file device/auto-events]}]
   {:query [:device/name :device/description :device/labels :device/profile :device/service fs/form-config-join :device-type
            {:new-device (prim/get-query DeviceTypeEntry)}
            {:devices (prim/get-query DeviceNames)}
@@ -811,14 +780,12 @@
            {:ui/dropdown (prim/get-query b/Dropdown)}
            {:ui/dropdown2 (prim/get-query b/Dropdown)}
            {:profile-file (prim/get-query FileUpload)}
-           {:device/protocols (prim/get-query ProtocolTable)}
            {:device/auto-events (prim/get-query AutoEventTable)}]
    :initial-state (fn [p] {:device/name  "" :device/description "" :device/labels []
                            :new-device (prim/get-initial-state DeviceTypeEntry {})
                            :ui/dropdown (prim/get-initial-state b/Dropdown {})
                            :ui/dropdown2 (prim/get-initial-state b/Dropdown {})
                            :profile-file (prim/get-initial-state FileUpload {:upload-id 0})
-                           :device/protocols (prim/get-initial-state ProtocolTable {})
                            :device/auto-events (prim/get-initial-state AutoEventTable {})})
    :form-fields #{:device/name :device/description :device/labels :device/profile :device/service :new-device}
    :ident (fn [] co/new-device-entry)}
@@ -840,9 +807,7 @@
                                              (input-with-label this :device/labels "Labels:" "" "Labels (one per line)" nil
                                                                (fn [attrs]
                                                                  (let [attrs (merge attrs {:onChange change})]
-                                                                   (dom/textarea (clj->js attrs)))))
-                                             (when (not= device-type ::modbus)
-                                               (ui-prt-table protocols)))
+                                                                   (dom/textarea (clj->js attrs))))))
                                     (ui-device-type-entry (assoc new-device :device-type device-type))
                                     (dom/div :.form-group
                                              (input-with-label this :device/profile "Device Profile:" "" "" nil
@@ -882,7 +847,7 @@
 
 (def ui-device-entry (prim/factory DeviceEntry))
 
-(defn device-data [device-type name description labels new-device profile-name service-name protocols auto-events]
+(defn device-data [device-type name description labels new-device profile-name service-name auto-events]
   (let [device {:name name
                 :description description
                 :labels labels
@@ -893,30 +858,19 @@
                      ::opc-ua (-> new-device :opcua opc-ua-info)
                      ::bacnet-ip (-> new-device :bacnet-ip bacnet-ip-info)
                      ::bacnet-mstp (-> new-device :bacnet-mstp bacnet-mstp-info)
-                     ::other (-> new-device :other other-info))
-        set-default (fn [m k] (update m k #(or % "")))
-        address-keys [:protocol :path :publisher :topic :user :password]
-        set-defaults #(reduce set-default % address-keys)
-        set-port (fn [m] (update m :port #(or % 0)))
-        set-method (fn [m] (update m :method #(or % :get)))]
+                     ::other (-> new-device :other other-info))]
     (-> device
         (merge extra-data)
-        (merge protocols)
-        (merge auto-events)
-        set-defaults
-        set-port
-        set-method)))
+        (merge auto-events))))
 
 (defn add-new-device [comp {:keys [device-entry device-type-selection] :as props}]
   (let [device-type (:ui/device-type device-type-selection)
-        {:keys [device/name device/description device/labels device/profile device/service new-device profiles services device/protocols device/auto-events]} device-entry
+        {:keys [device/name device/description device/labels device/profile device/service new-device profiles services device/auto-events]} device-entry
         profile-name (-> (filter #(= profile (:id %)) profiles) first :name)
         service-name (-> (filter #(= service (:id %)) services) first :name)
-        {:keys [ui/prts prt-props]} protocols
-        final-prt (if (= device-type ::modbus) nil {:protocols {prts prt-props}})
         {:keys [ui/autoevents]} auto-events
         final-autoevents {:autoEvents (mapv #(select-keys % [:frequency :onChange :resource]) autoevents)}
-        device (device-data device-type name description labels new-device profile-name service-name final-prt final-autoevents)]
+        device (device-data device-type name description labels new-device profile-name service-name final-autoevents)]
     (prim/transact! comp `[(mu/add-device ~device)
                            (fs/reset-form!)
                            (b/hide-modal {:id :add-device-modal})
