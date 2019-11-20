@@ -33,6 +33,7 @@ pipeline {
                     def semverVersion = edgeXSemver()
                     env.setProperty('VERSION', semverVersion)
                     sh 'echo $VERSION > VERSION'
+                    stash name: 'semver', includes: '.semver/**,VERSION', useDefaultExcludes: false
                 }
             }
         }
@@ -49,7 +50,7 @@ pipeline {
                                 edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
 
                                 script {
-                                    image_amd64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                                    image_amd64 = docker.build('docker-edgex-ui-clojure', '-f Dockerfile .')
                                 }
                             }
                         }
@@ -59,9 +60,9 @@ pipeline {
                             steps {
                                 script {
                                     docker.withRegistry("https://${env.DOCKER_REGISTRY}:10004") {
-                                        image_amd64.push("amd64")
-                                        image_amd64.push(env.GIT_COMMIT)
                                         image_amd64.push(env.VERSION)
+                                        image_amd64.push("${env.SEMVER_BRANCH}")
+                                        image_amd64.push("${env.GIT_COMMIT}-${env.VERSION}")
                                     }
                                 }
                             }
@@ -79,7 +80,7 @@ pipeline {
                                 edgeXDockerLogin(settingsFile: env.MVN_SETTINGS)
 
                                 script {
-                                    image_arm64 = docker.build('edgex-ui-clojure', '-f Dockerfile .')
+                                    image_arm64 = docker.build('docker-edgex-ui-clojure-arm64', '-f Dockerfile .')
                                 }
                             }
                         }
@@ -89,9 +90,9 @@ pipeline {
                             steps {
                                 script {
                                     docker.withRegistry("https://${env.DOCKER_REGISTRY}:10004") {
-                                        image_arm64.push("arm64")
-                                        image_arm64.push("${env.GIT_COMMIT}-arm64")
-                                        image_arm64.push("${env.VERSION}-arm64")
+                                        image_arm64.push(env.VERSION)
+                                        image_arm64.push("${env.SEMVER_BRANCH}")
+                                        image_arm64.push("${env.GIT_COMMIT}-${env.VERSION}")
                                     }
                                 }
                             }
